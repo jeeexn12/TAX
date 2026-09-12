@@ -124,7 +124,7 @@ export function replay(transactions) {
  * 시점의 잔량까지 확인해 가장 빡빡한 값을 돌려준다. 중간에 분할이 있으면
  * 팔린 주식도 같은 비율로 불어나므로 그만큼 나눠서 환산한다.
  */
-export function maxSellableQuantity(transactions, ticker, date) {
+export function sellableInfo(transactions, ticker, date) {
   const sorted = sortedByDate(transactions.filter((tx) => tx.ticker === ticker));
 
   let quantity = 0;
@@ -134,8 +134,11 @@ export function maxSellableQuantity(transactions, ticker, date) {
     else if (tx.type === "sell") quantity -= Number(tx.quantity);
   }
 
+  const heldAtDate = quantity;
   let limit = quantity;
+  let limitedBy = null;
   let splitFactor = 1;
+
   for (const tx of sorted.filter((tx) => tx.date > date)) {
     if (tx.type === "split") {
       const ratio = Number(tx.ratio);
@@ -146,10 +149,17 @@ export function maxSellableQuantity(transactions, ticker, date) {
     } else if (tx.type === "sell") {
       quantity -= Number(tx.quantity);
     }
-    limit = Math.min(limit, quantity / splitFactor);
+    if (quantity / splitFactor < limit) {
+      limit = quantity / splitFactor;
+      limitedBy = tx;
+    }
   }
 
-  return Math.max(0, limit);
+  return { max: Math.max(0, limit), heldAtDate, limitedBy };
+}
+
+export function maxSellableQuantity(transactions, ticker, date) {
+  return sellableInfo(transactions, ticker, date).max;
 }
 
 /** 거래를 추가해도 원장이 깨지지 않는지 미리 확인한다. 화면에서 입력을 막는 용도. */

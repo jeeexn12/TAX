@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>미국주식 양도소득세 시뮬레이터</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <h1>미국주식 양도소득세 시뮬레이터</h1>
+      <p class="subtitle">매도 전에 세금을 미리 계산해 자금계획을 세우는 도구</p>
+    </header>
+
+    <nav class="tabs" role="tablist">
+      <button class="tab is-active" data-tab="input" role="tab">거래입력</button>
+      <button class="tab" data-tab="holdings" role="tab">보유현황</button>
+      <button class="tab" data-tab="history" role="tab">내역</button>
+    </nav>
+
+    <main>
+      <section class="panel is-active" data-panel="input">
+        <form id="tx-form" class="card" autocomplete="off">
+          <div class="field">
+            <span class="label">거래 종류</span>
+            <div class="segmented" id="type-picker">
+              <label><input type="radio" name="type" value="buy" checked /><span>매수</span></label>
+              <label><input type="radio" name="type" value="sell" /><span>매도</span></label>
+              <label><input type="radio" name="type" value="split" /><span>주식분할</span></label>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="field">
+              <label class="label" for="ticker">티커</label>
+              <input id="ticker" name="ticker" placeholder="AAPL" required />
+            </div>
+
+            <div class="field">
+              <label class="label" for="date">거래일</label>
+              <input id="date" name="date" type="date" required />
+            </div>
+
+            <div class="field" data-only="split" hidden>
+              <label class="label" for="ratio">분할비율</label>
+              <input id="ratio" name="ratio" type="number" step="any" min="0" placeholder="4" />
+              <p class="hint">1주가 4주가 되면 <b>4</b>, 4주가 1주로 병합되면 <b>0.25</b></p>
+            </div>
+
+            <div class="field" data-only="trade">
+              <label class="label" for="quantity">수량</label>
+              <input id="quantity" name="quantity" type="number" step="any" min="0" placeholder="10" />
+            </div>
+
+            <div class="field" data-only="trade">
+              <label class="label" for="price">단가 (USD)</label>
+              <input id="price" name="price" type="number" step="any" min="0" placeholder="180.50" />
+            </div>
+
+            <div class="field" data-only="trade">
+              <label class="label" for="fee">수수료 (USD)</label>
+              <input id="fee" name="fee" type="number" step="any" min="0" placeholder="0" />
+              <p class="hint">증권사 매매수수료만. 환전·송금수수료 제외</p>
+            </div>
+          </div>
+
+          <div class="field fx-field" data-only="trade">
+            <div class="fx-head">
+              <span class="label">적용환율 (USD/KRW)</span>
+              <label class="checkbox">
+                <input type="checkbox" id="fx-manual" />
+                <span>직접 입력</span>
+              </label>
+            </div>
+            <input id="fx-rate" type="number" step="any" min="0" disabled placeholder="거래일을 입력하면 자동 조회" />
+            <p class="hint" id="fx-note">거래일을 입력하면 그날 고시환율을 가져옵니다.</p>
+          </div>
+
+          <p class="notice" id="sell-notice" hidden></p>
+          <p class="error" id="form-error" hidden></p>
+
+          <div class="actions">
+            <button type="submit" id="submit-btn">거래 추가</button>
+          </div>
+        </form>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>입력한 거래</h2>
+            <span class="count" id="tx-count"></span>
+          </div>
+          <div class="table-scroll">
+            <table id="tx-table">
+              <thead>
+                <tr>
+                  <th>거래일</th>
+                  <th>종류</th>
+                  <th>티커</th>
+                  <th class="num">수량</th>
+                  <th class="num">단가(USD)</th>
+                  <th class="num">수수료(USD)</th>
+                  <th class="num">적용환율</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="empty" id="tx-empty">아직 입력한 거래가 없습니다.</p>
+        </section>
+      </section>
+
+      <section class="panel" data-panel="holdings">
+        <div class="card placeholder">보유현황 화면은 다음 단계에서 만듭니다.</div>
+      </section>
+
+      <section class="panel" data-panel="history">
+        <div class="card placeholder">내역 화면은 다음 단계에서 만듭니다.</div>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p class="disclaimer">
+        본 도구의 계산 결과에 대해 어떠한 책임도 지지 않습니다. 실제 신고 전
+        반드시 세무전문가의 확인을 받으시기 바랍니다.
+      </p>
+      <p class="storage-note">
+        거래 기록은 이 브라우저에만 저장되며 서버로 전송되지 않습니다. 방문기록·쿠키를
+        삭제하면 함께 지워지니, 내역 화면에서 백업 파일을 내려받아 보관하세요.
+      </p>
+    </footer>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
