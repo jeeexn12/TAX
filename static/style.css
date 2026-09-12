@@ -366,6 +366,77 @@ tbody tr:last-child td {
   margin: 0;
 }
 
+.settings {
+  max-width: 1040px;
+  margin: 16px auto 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.settings summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 18px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-summary {
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.settings-toggle {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.settings-body {
+  padding: 4px 18px 18px;
+  border-top: 1px solid var(--border);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.settings-body .field {
+  margin-bottom: 0;
+  padding-top: 14px;
+}
+
+.settings-body .hint {
+  max-width: 460px;
+}
+
+.inline-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.inline-field input {
+  width: 68px;
+  text-align: center;
+}
+
+.year-cross {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+.year-cross small {
+  font-weight: 400;
+}
+
 .segmented.small span {
   padding: 6px 13px;
   font-size: 13px;

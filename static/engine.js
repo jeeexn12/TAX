@@ -30,10 +30,12 @@ export class Holding {
 }
 
 export class RealizedSale {
-  constructor({ txId, ticker, date, quantity, proceedsKrw, costKrw }) {
+  constructor({ txId, ticker, date, tradeDate, quantity, proceedsKrw, costKrw }) {
     this.txId = txId;
     this.ticker = ticker;
+    /** 결제일. 대금청산일이 양도시기이므로 이 날짜가 귀속 연도를 정한다. */
     this.date = date;
+    this.tradeDate = tradeDate;
     this.quantity = quantity;
     this.proceedsKrw = proceedsKrw;
     this.costKrw = costKrw;
@@ -42,12 +44,29 @@ export class RealizedSale {
   get gainKrw() {
     return this.proceedsKrw - this.costKrw;
   }
+
+  get crossesYear() {
+    return this.date.slice(0, 4) !== this.tradeDate.slice(0, 4);
+  }
+}
+
+/**
+ * 계산의 기준이 되는 날짜. 양도·취득시기가 모두 대금청산일이므로 결제일을 쓴다.
+ * (소득세법 제98조, 시행령 제178조의5 제1항)
+ *
+ * 결제일이 없는 기록은 결제일 개념을 넣기 전에 입력된 것이므로 체결일을 쓴다.
+ * 주식분할은 대금 수수가 없어 결제일 자체가 없다.
+ */
+export function effectiveDate(tx) {
+  return tx.settlement_date || tx.date;
 }
 
 function sortedByDate(transactions) {
   return [...transactions].sort((a, b) => {
-    if (a.date < b.date) return -1;
-    if (a.date > b.date) return 1;
+    const left = effectiveDate(a);
+    const right = effectiveDate(b);
+    if (left < right) return -1;
+    if (left > right) return 1;
     return 0;
   });
 }
@@ -96,7 +115,8 @@ export function replay(transactions) {
         new RealizedSale({
           txId: tx.id ?? "",
           ticker,
-          date: tx.date,
+          date: effectiveDate(tx),
+          tradeDate: tx.date,
           quantity,
           proceedsKrw: (grossUsd - feeUsd) * fxRate,
           costKrw,
@@ -128,7 +148,7 @@ export function sellableInfo(transactions, ticker, date) {
   const sorted = sortedByDate(transactions.filter((tx) => tx.ticker === ticker));
 
   let quantity = 0;
-  for (const tx of sorted.filter((tx) => tx.date <= date)) {
+  for (const tx of sorted.filter((tx) => effectiveDate(tx) <= date)) {
     if (tx.type === "split") quantity *= Number(tx.ratio);
     else if (tx.type === "buy") quantity += Number(tx.quantity);
     else if (tx.type === "sell") quantity -= Number(tx.quantity);
@@ -139,7 +159,7 @@ export function sellableInfo(transactions, ticker, date) {
   let limitedBy = null;
   let splitFactor = 1;
 
-  for (const tx of sorted.filter((tx) => tx.date > date)) {
+  for (const tx of sorted.filter((tx) => effectiveDate(tx) > date)) {
     if (tx.type === "split") {
       const ratio = Number(tx.ratio);
       quantity *= ratio;
@@ -198,6 +218,9 @@ export function calculateTax(totalGainKrw) {
 
 /**
  * 해당 연도 기준 보유현황, 실현 매도 내역, 세액을 함께 반환한다.
+ *
+ * 귀속 연도는 체결일이 아니라 결제일로 가른다. 12월 말 매도가 다음 해 초에
+ * 결제되면 그 해가 아니라 다음 해 소득이 된다.
  *
  * 기본공제는 매도 건마다 차감되는 게 아니라, 그 해 매도를 전부 합산한
  * 뒤(손익통산) 연 1회만 적용된다.

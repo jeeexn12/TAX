@@ -5,7 +5,7 @@
 하루 1,000회 조회 제한을 서버 캐시로 공유하기 위해 중계만 한다.
 """
 
-from datetime import date
+from datetime import date, timedelta
 
 from flask import Flask, jsonify, request, send_from_directory
 
@@ -61,15 +61,34 @@ def price():
         return jsonify({"error": "시세 서버에 연결하지 못했습니다. 직접 입력해주세요."}), 502
 
 
+def _settlement_date(trade_day: date, business_days: int) -> date:
+    """체결일 + N영업일. 주말만 제외하며 settings.js의 계산과 같아야 한다."""
+    cursor = trade_day
+    added = 0
+    while added < business_days:
+        cursor += timedelta(days=1)
+        if cursor.weekday() < 5:
+            added += 1
+    return cursor
+
+
 @app.get("/api/history")
 def history():
-    """정액 반복매수 미리보기에 쓰는 거래일별 종가 + 그날 고시환율.
+    """정액 반복매수 미리보기에 쓰는 거래일별 종가 + 결제일 고시환율.
 
-    금액은 받지 않는다. 수량 역산은 브라우저에서 하므로 서버는 공개 시세만 다룬다.
+    환율은 체결일이 아니라 결제일 기준이다(시행령 제178조의5 제1항). 금액은 받지
+    않는다. 수량 역산은 브라우저에서 하므로 서버는 공개 시세만 다룬다.
     """
     ticker = request.args.get("ticker", "").strip().upper()
     if not ticker:
         return jsonify({"error": "티커를 입력해주세요."}), 400
+
+    try:
+        settlement_days = int(request.args.get("settlement_days", 2))
+    except ValueError:
+        return jsonify({"error": "결제일 기준이 올바르지 않습니다."}), 400
+    if not 0 <= settlement_days <= 10:
+        return jsonify({"error": "결제일 기준은 0~10영업일 사이여야 합니다."}), 400
 
     try:
         start = date.fromisoformat(request.args.get("start", ""))
@@ -91,8 +110,10 @@ def history():
     except Exception:
         return jsonify({"error": "시세 서버에 연결하지 못했습니다. 잠시 후 다시 시도해주세요."}), 502
 
+    settlements = {d: _settlement_date(d, settlement_days) for d, _ in closes}
+
     try:
-        rates = get_usd_krw_rates([d for d, _ in closes])
+        rates = get_usd_krw_rates(list(settlements.values()))
     except FxLookupError as err:
         return jsonify({"error": str(err)}), 502
     except Exception:
@@ -101,13 +122,15 @@ def history():
     return jsonify(
         {
             "ticker": ticker,
+            "settlement_days": settlement_days,
             "rows": [
                 {
                     "date": d.isoformat(),
+                    "settlement_date": settlements[d].isoformat(),
                     "close_usd": round(close, 4),
-                    "fx_rate": rates[d].rate,
-                    "fx_applied_date": rates[d].applied_date.isoformat(),
-                    "fx_is_fallback": rates[d].is_fallback,
+                    "fx_rate": rates[settlements[d]].rate,
+                    "fx_applied_date": rates[settlements[d]].applied_date.isoformat(),
+                    "fx_is_fallback": rates[settlements[d]].is_fallback,
                 }
                 for d, close in closes
             ],

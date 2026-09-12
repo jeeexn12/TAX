@@ -81,7 +81,13 @@ export function validateTransactions(raw) {
       throw new StorageError(`${where}: 종목 티커가 비어 있습니다.`);
     }
     if (typeof tx.date !== "string" || !DATE_PATTERN.test(tx.date)) {
-      throw new StorageError(`${where}: 거래일 형식이 올바르지 않습니다. (예: 2026-01-15)`);
+      throw new StorageError(`${where}: 체결일 형식이 올바르지 않습니다. (예: 2026-01-15)`);
+    }
+    if (tx.settlement_date != null && !DATE_PATTERN.test(tx.settlement_date)) {
+      throw new StorageError(`${where}: 결제일 형식이 올바르지 않습니다. (예: 2026-01-17)`);
+    }
+    if (tx.settlement_date && tx.settlement_date < tx.date) {
+      throw new StorageError(`${where}: 결제일이 체결일보다 빠릅니다.`);
     }
 
     if (tx.type === "split") {
@@ -112,6 +118,7 @@ export function validateTransactions(raw) {
       type: tx.type,
       ticker: tx.ticker.trim().toUpperCase(),
       date: tx.date,
+      settlement_date: tx.settlement_date ?? null,
       quantity: Number(tx.quantity),
       price_usd: Number(tx.price_usd),
       fee_usd: Number(tx.fee_usd ?? 0),

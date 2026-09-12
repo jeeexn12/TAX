@@ -66,6 +66,7 @@ export function buildLots({ ticker, currency, amount, rows }) {
       type: "buy",
       ticker,
       date: row.date,
+      settlement_date: row.settlement_date ?? null,
       quantity: amountUsd / row.close_usd,
       price_usd: row.close_usd,
       fee_usd: 0,

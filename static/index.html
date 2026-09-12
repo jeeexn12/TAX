@@ -19,6 +19,48 @@
     </nav>
 
     <main>
+      <details class="settings" id="settings">
+        <summary>
+          <span class="settings-summary" id="settings-summary"></span>
+          <span class="settings-toggle">설정</span>
+        </summary>
+        <div class="settings-body">
+          <div class="field">
+            <span class="label">
+              취득가액 계산방법
+              <em class="label-note">소득세법 시행령 제162조 제5항에 따라 선입선출법이 원칙</em>
+            </span>
+            <div class="segmented small">
+              <label><input type="radio" name="cost-method" value="fifo" /><span>선입선출법</span></label>
+              <label><input type="radio" name="cost-method" value="average" /><span>이동평균법</span></label>
+            </div>
+            <p class="hint">
+              이동평균법은 증권회사가 기업회계기준에 따라 과세연도별로 계속 적용하는 경우에만
+              쓸 수 있습니다. 투자자가 임의로 고르는 것이 아니니 증권사에 확인하세요.
+            </p>
+            <p class="hint is-warning" id="method-warning" hidden></p>
+          </div>
+
+          <div class="field">
+            <label class="label" for="settlement-days">
+              결제일 기준
+              <em class="label-note">체결일 + N영업일 · 새로 입력하는 거래에 적용</em>
+            </label>
+            <div class="inline-field">
+              <span>체결일 +</span>
+              <input id="settlement-days" type="number" min="0" max="10" step="1" />
+              <span>영업일</span>
+            </div>
+            <p class="hint">
+              미국 현지 결제는 2024-05-28부터 T+1이고 국내 증권사가 고객계좌에 반영하기까지
+              통상 하루가 더 걸려 T+2를 기본값으로 둡니다. 그 이전 거래는 T+3인 경우가 많습니다.
+              주말만 제외하고 공휴일은 반영하지 않으니, 명세서의 입출금일과 다르면
+              거래별로 결제일을 고쳐주세요.
+            </p>
+          </div>
+        </div>
+      </details>
+
       <section class="panel is-active" data-panel="input">
         <form id="tx-form" class="card" autocomplete="off">
           <div class="field">
@@ -38,8 +80,17 @@
             </div>
 
             <div class="field" data-only="single">
-              <label class="label" for="date">거래일</label>
+              <label class="label" for="date">체결일</label>
               <input id="date" name="date" type="date" required />
+            </div>
+
+            <div class="field" data-only="trade">
+              <label class="label" for="settlement-date">
+                결제일
+                <em class="label-note">대금 입출금일 · 환율은 이 날짜 기준</em>
+              </label>
+              <input id="settlement-date" type="date" />
+              <p class="hint" id="settlement-note"></p>
             </div>
 
             <div class="field" data-only="dca" hidden>
@@ -103,7 +154,7 @@
             <div class="fx-head">
               <span class="label">
                 적용환율 (USD/KRW)
-                <em class="label-note">체결일 기준 매매기준율 · 실시간 시세 아님</em>
+                <em class="label-note">결제일 기준 매매기준율 · 실시간 시세 아님</em>
               </span>
               <label class="checkbox">
                 <input type="checkbox" id="fx-manual" />
@@ -133,7 +184,8 @@
             <table id="dca-preview-table">
               <thead>
                 <tr>
-                  <th>날짜</th>
+                  <th>체결일</th>
+                  <th>결제일</th>
                   <th class="num">종가 (USD)</th>
                   <th class="num">적용환율</th>
                   <th class="num">수량</th>
@@ -159,7 +211,8 @@
             <table id="tx-table">
               <thead>
                 <tr>
-                  <th>거래일</th>
+                  <th>체결일</th>
+                  <th>결제일</th>
                   <th>종류</th>
                   <th>티커</th>
                   <th class="num">수량</th>

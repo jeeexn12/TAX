@@ -34,6 +34,10 @@ function split(ticker, date, ratio, id = "") {
   return { id, type: "split", ticker, date, ratio };
 }
 
+function settled(tx, settlementDate) {
+  return { ...tx, settlement_date: settlementDate };
+}
+
 test("이동평균 취득가액은 매수일별 환율로 환산해 누적된다", () => {
   const { holdings } = replay([
     buy("AAPL", "2026-01-10", 10, 100, 1300),
@@ -342,6 +346,67 @@ test("분할비율이 0 이하면 오류", () => {
     () => replay([buy("AAPL", "2026-01-10", 10, 100, 1300), split("AAPL", "2026-05-20", 0)]),
     EngineError
   );
+});
+
+test("12월 30일 매도라도 결제일이 1월 2일이면 다음 해 소득이다", () => {
+  const transactions = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    settled(sell("AAPL", "2026-12-30", 10, 200, 1300), "2027-01-02"),
+  ];
+
+  const year2026 = annualSummary(transactions, 2026);
+  const year2027 = annualSummary(transactions, 2027);
+
+  assert.equal(year2026.yearSales.length, 0);
+  assert.equal(year2026.tax.totalGainKrw, 0);
+
+  assert.equal(year2027.yearSales.length, 1);
+  assert.equal(year2027.tax.totalGainKrw, 1_300_000);
+  assert.equal(year2027.yearSales[0].tradeDate, "2026-12-30");
+  assert.equal(year2027.yearSales[0].date, "2027-01-02");
+  assert.equal(year2027.yearSales[0].crossesYear, true);
+});
+
+test("해를 넘긴 매도는 다음 해 기본공제와 통산된다", () => {
+  const decemberSaleSettlingInJanuary = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    settled(sell("AAPL", "2026-12-30", 10, 500, 1300), "2027-01-02"),
+    buy("MSFT", "2027-02-01", 10, 100, 1300),
+    settled(sell("MSFT", "2027-03-02", 10, 300, 1300), "2027-03-04"),
+  ];
+
+  const { tax } = annualSummary(decemberSaleSettlingInJanuary, 2027);
+
+  // AAPL 520만 + MSFT 260만이 2027년에 함께 통산된다.
+  assert.equal(tax.totalGainKrw, 7_800_000);
+  assert.equal(tax.deductionKrw, 2_500_000);
+  assert.equal(tax.totalTaxKrw, 1_166_000);
+});
+
+test("결제일 순서로 재생하므로 체결일이 빨라도 결제가 늦으면 나중에 반영된다", () => {
+  const transactions = [
+    settled(buy("AAPL", "2026-03-02", 10, 100, 1300), "2026-03-06"),
+    settled(buy("AAPL", "2026-03-03", 10, 200, 1400), "2026-03-05"),
+  ];
+
+  const { holdings } = replay(transactions);
+
+  // 두 건 모두 취득되므로 합계는 순서와 무관하지만, 매도 대응 순서가 달라진다.
+  assert.equal(holdings.get("AAPL").quantity, 20);
+  assert.equal(holdings.get("AAPL").totalCostKrw, 1_300_000 + 2_800_000);
+});
+
+test("결제일이 없는 기존 기록은 체결일을 그대로 쓴다", () => {
+  const legacy = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    sell("AAPL", "2026-06-10", 10, 200, 1300),
+  ];
+
+  const { tax, yearSales } = annualSummary(legacy, 2026);
+
+  assert.equal(yearSales[0].date, "2026-06-10");
+  assert.equal(yearSales[0].crossesYear, false);
+  assert.equal(tax.totalGainKrw, 1_300_000);
 });
 
 test("환율 가정을 1,250~1,500원으로 훑으면 구간별 세액이 나온다", () => {

@@ -7,6 +7,7 @@ import {
   scheduledDates,
 } from "./dca.js";
 import { initHoldings, refreshHoldings } from "./holdings.js";
+import { COST_METHODS, loadSettings, saveSettings, settlementDate } from "./settings.js";
 import {
   addTransaction,
   addTransactions,
@@ -24,6 +25,11 @@ const el = {
   form: document.getElementById("tx-form"),
   ticker: document.getElementById("ticker"),
   date: document.getElementById("date"),
+  settlementDate: document.getElementById("settlement-date"),
+  settlementNote: document.getElementById("settlement-note"),
+  settingsSummary: document.getElementById("settings-summary"),
+  settlementDays: document.getElementById("settlement-days"),
+  methodWarning: document.getElementById("method-warning"),
   ratio: document.getElementById("ratio"),
   quantity: document.getElementById("quantity"),
   price: document.getElementById("price"),
@@ -53,6 +59,7 @@ const el = {
 };
 
 let transactions = loadTransactions();
+let settings = loadSettings();
 let fxAppliedDate = null;
 let fxRequestToken = 0;
 let dcaPreview = null;
@@ -100,10 +107,44 @@ function applyTypeVisibility() {
   if (type !== "dca") hidePreview();
 }
 
+/** 결제일을 체결일 + N영업일로 다시 계산한다. 사용자가 직접 고친 값은 건드리지 않는다. */
+function refreshSettlementDate({ force = false } = {}) {
+  const type = selectedType();
+  if (type !== "buy" && type !== "sell") return;
+  if (!el.date.value) return;
+
+  const auto = settlementDate(el.date.value, settings.settlementDays);
+  if (force || !el.settlementDate.value || el.settlementDate.dataset.auto !== "false") {
+    el.settlementDate.value = auto;
+    el.settlementDate.dataset.auto = "true";
+  }
+
+  const manual = el.settlementDate.value !== auto;
+  const crossesYear = el.settlementDate.value.slice(0, 4) !== el.date.value.slice(0, 4);
+  const parts = [
+    manual
+      ? "직접 지정한 결제일입니다."
+      : `체결일 + ${settings.settlementDays}영업일로 계산했습니다.`,
+  ];
+  if (crossesYear) {
+    parts.push(
+      `결제일이 ${el.settlementDate.value.slice(0, 4)}년이라 이 거래는 ${el.settlementDate.value.slice(
+        0,
+        4
+      )}년 소득으로 잡힙니다.`
+    );
+  }
+  el.settlementNote.textContent = parts.join(" ");
+  el.settlementNote.className = crossesYear ? "hint is-warning" : "hint";
+}
+
+/** 환율은 체결일이 아니라 결제일(대금 입출금일) 기준으로 조회한다. */
 async function loadFxForDate() {
-  const date = el.date.value;
-  if (!date || selectedType() !== "buy" && selectedType() !== "sell") return;
-  if (el.fxManual.checked) return;
+  const type = selectedType();
+  if (type !== "buy" && type !== "sell") return;
+
+  const date = el.settlementDate.value;
+  if (!date || el.fxManual.checked) return;
 
   const token = ++fxRequestToken;
   el.fxNote.textContent = "고시환율 조회 중…";
@@ -121,13 +162,13 @@ async function loadFxForDate() {
     fxAppliedDate = data.applied_date;
 
     if (date > today()) {
-      el.fxNote.textContent = `아직 고시되지 않은 날짜입니다. 최신 고시환율(${dateKr(
+      el.fxNote.textContent = `결제일이 아직 오지 않아 고시환율이 없습니다. 최신 고시환율(${dateKr(
         data.applied_date
-      )})을 임시로 넣었으니, 실제 매도 후 그날 환율로 정정하세요.`;
+      )})을 임시로 넣었으니, 결제 후 그날 환율로 정정하세요.`;
       el.fxNote.className = "hint is-warning";
     } else {
       el.fxNote.textContent = data.is_fallback
-        ? `${data.applied_label} (거래일에는 고시가 없어 직전 영업일 환율을 씁니다)`
+        ? `${data.applied_label} (결제일에는 고시가 없어 직전 영업일 환율을 씁니다)`
         : data.applied_label;
       el.fxNote.className = "hint";
     }
@@ -143,7 +184,8 @@ async function loadFxForDate() {
 
 function describeSellable() {
   const ticker = el.ticker.value.trim().toUpperCase();
-  const date = el.date.value;
+  // 보유 판정도 결제일 기준이어야 원장 재생 순서와 어긋나지 않는다.
+  const date = el.settlementDate.value || el.date.value;
   if (selectedType() !== "sell" || !ticker || !date) return null;
   return sellableInfo(transactions, ticker, date);
 }
@@ -179,6 +221,7 @@ function buildTransaction() {
 
   return {
     ...base,
+    settlement_date: el.settlementDate.value || null,
     quantity: Number(el.quantity.value),
     price_usd: Number(el.price.value),
     fee_usd: Number(el.fee.value || 0),
@@ -202,13 +245,15 @@ function findError() {
     return null;
   }
 
-  if (!el.date.value) return "거래일을 입력해주세요.";
+  if (!el.date.value) return "체결일을 입력해주세요.";
 
   if (type === "split") {
     if (!(Number(el.ratio.value) > 0)) return "분할비율은 0보다 커야 합니다.";
     return null;
   }
 
+  if (!el.settlementDate.value) return "결제일을 입력해주세요.";
+  if (el.settlementDate.value < el.date.value) return "결제일이 체결일보다 빠릅니다.";
   if (!(Number(el.quantity.value) > 0)) return "수량은 0보다 커야 합니다.";
   if (!(Number(el.price.value) >= 0)) return "단가를 입력해주세요.";
   if (!(Number(el.fxRate.value) > 0)) return "적용환율을 확인해주세요.";
@@ -278,7 +323,8 @@ async function buildPreview() {
 
   try {
     const response = await fetch(
-      `/api/history?ticker=${encodeURIComponent(ticker)}&start=${start}&end=${end}`
+      `/api/history?ticker=${encodeURIComponent(ticker)}&start=${start}&end=${end}` +
+        `&settlement_days=${settings.settlementDays}`
     );
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
@@ -311,8 +357,10 @@ function renderPreview() {
   el.dcaBody.innerHTML = "";
   lots.forEach((lot, i) => {
     const row = document.createElement("tr");
+    const crossesYear = lot.settlement_date?.slice(0, 4) !== lot.date.slice(0, 4);
     row.innerHTML = `
       <td>${lot.date}</td>
+      <td class="${crossesYear ? "year-cross" : ""}">${lot.settlement_date ?? "—"}</td>
       <td class="num">${number(lot.price_usd, 4)}</td>
       <td class="num">${number(lot.fx_rate, 2)}${
         rows[i].fx_is_fallback ? `<br /><small class="muted">${dateKr(rows[i].fx_applied_date)} 고시</small>` : ""
@@ -330,9 +378,16 @@ function renderPreview() {
   if (selectedFrequency() === "weekly") {
     notes.push(`매주 기준으로 ${lots.length}회차를 골랐습니다.`);
   }
+  notes.push(`환율은 결제일(체결일 + ${settings.settlementDays}영업일) 기준으로 조회했습니다.`);
   const fallbacks = rows.filter((row) => row.fx_is_fallback).length;
   if (fallbacks) {
-    notes.push(`${fallbacks}건은 그날 고시가 없어 직전 영업일 환율을 적용했습니다.`);
+    notes.push(`${fallbacks}건은 결제일에 고시가 없어 직전 영업일 환율을 적용했습니다.`);
+  }
+  const yearCrossing = lots.filter(
+    (lot) => lot.settlement_date?.slice(0, 4) !== lot.date.slice(0, 4)
+  ).length;
+  if (yearCrossing) {
+    notes.push(`${yearCrossing}건은 결제일이 다음 해로 넘어갑니다.`);
   }
   if (end > today()) notes.push("종료일이 미래라 오늘까지만 생성했습니다.");
 
@@ -363,7 +418,11 @@ function savePreview() {
 }
 
 function renderTable() {
-  const sorted = [...transactions].sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+  const sorted = [...transactions].sort((a, b) => {
+    const left = a.settlement_date || a.date;
+    const right = b.settlement_date || b.date;
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
 
   el.tableBody.innerHTML = "";
   for (const tx of sorted) {
@@ -386,8 +445,15 @@ function readRow(tx) {
       ? `<span class="tag ${tx.corrected ? "tag-fixed" : ""}">${tx.corrected ? "정정됨" : "자동생성"}</span>`
       : "";
 
+  const crossesYear =
+    tx.settlement_date && tx.settlement_date.slice(0, 4) !== tx.date.slice(0, 4);
+
   row.innerHTML = `
     <td>${tx.date}</td>
+    <td class="${crossesYear ? "year-cross" : ""}">
+      ${isSplit ? "—" : (tx.settlement_date ?? "—")}
+      ${crossesYear ? `<br /><small>${tx.settlement_date.slice(0, 4)}년 귀속</small>` : ""}
+    </td>
     <td><span class="pill pill-${tx.type}">${TYPE_LABELS[tx.type]}</span>${badge}</td>
     <td class="ticker">${tx.ticker}</td>
     <td class="num">${isSplit ? `${number(tx.ratio, 4)}배` : number(tx.quantity, 8)}</td>
@@ -406,6 +472,7 @@ function editRow(tx) {
   row.className = "is-editing";
   row.innerHTML = `
     <td>${tx.date}</td>
+    <td><input class="cell-input" type="date" value="${tx.settlement_date ?? ""}" data-field="settlement_date" /></td>
     <td><span class="pill pill-${tx.type}">${TYPE_LABELS[tx.type]}</span></td>
     <td class="ticker">${tx.ticker}</td>
     <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${tx.quantity}" data-field="quantity" /></td>
@@ -423,11 +490,18 @@ function commitEdit(id) {
   const row = el.tableBody.querySelector("tr.is-editing");
   const fields = {};
   row.querySelectorAll("[data-field]").forEach((input) => {
-    fields[input.dataset.field] = Number(input.value);
+    fields[input.dataset.field] =
+      input.dataset.field === "settlement_date" ? input.value || null : Number(input.value);
   });
 
   if (!(fields.quantity > 0) || !(fields.fx_rate > 0) || !(fields.price_usd >= 0)) {
     showRowError("수량과 환율은 0보다 커야 하고, 단가는 0 이상이어야 합니다.");
+    return;
+  }
+
+  const original = transactions.find((tx) => tx.id === id);
+  if (fields.settlement_date && fields.settlement_date < original.date) {
+    showRowError("결제일이 체결일보다 빠릅니다.");
     return;
   }
 
@@ -503,15 +577,71 @@ function handleSubmit(event) {
   validate();
 }
 
+function renderSettingsSummary() {
+  el.settingsSummary.textContent = `${COST_METHODS[settings.costMethod]} · 결제일 체결일+${
+    settings.settlementDays
+  }영업일`;
+}
+
+function reportedYears() {
+  const years = new Set(
+    transactions
+      .filter((tx) => tx.type === "sell")
+      .map((tx) => (tx.settlement_date || tx.date).slice(0, 4))
+  );
+  return [...years].sort();
+}
+
+function setupSettings() {
+  document.querySelector(`input[name="cost-method"][value="${settings.costMethod}"]`).checked = true;
+  el.settlementDays.value = settings.settlementDays;
+  renderSettingsSummary();
+
+  document.querySelectorAll('input[name="cost-method"]').forEach((radio) =>
+    radio.addEventListener("change", () => {
+      settings = saveSettings({ costMethod: radio.value });
+      renderSettingsSummary();
+
+      // 이동평균법은 증권사가 과세연도별로 계속 적용하는 경우에만 쓸 수 있다.
+      // 이미 신고를 마친 연도가 있으면 방법을 바꾸는 순간 실제 신고와 어긋난다.
+      const years = reportedYears();
+      if (years.length) {
+        el.methodWarning.textContent = `이미 매도가 확정된 연도(${years.join(
+          ", "
+        )})가 있습니다. 그 연도를 이미 신고하셨다면 방법을 바꾸면 실제 신고와 어긋날 수 있습니다. 과세연도별로 계속 적용해야 하는 요건도 확인하세요.`;
+        el.methodWarning.hidden = false;
+      } else {
+        el.methodWarning.hidden = true;
+      }
+
+      renderTable();
+      refreshHoldings(transactions);
+    })
+  );
+
+  el.settlementDays.addEventListener("change", () => {
+    const days = Math.min(10, Math.max(0, Math.round(Number(el.settlementDays.value) || 0)));
+    el.settlementDays.value = days;
+    settings = saveSettings({ settlementDays: days });
+    renderSettingsSummary();
+    refreshSettlementDate({ force: true });
+    loadFxForDate();
+    hidePreview();
+  });
+}
+
 function init() {
   setupTabs();
+  setupSettings();
   el.date.value = today();
   applyTypeVisibility();
+  refreshSettlementDate({ force: true });
   applyRangeLimit();
 
   document.querySelectorAll('input[name="type"]').forEach((radio) =>
     radio.addEventListener("change", () => {
       applyTypeVisibility();
+      refreshSettlementDate();
       loadFxForDate();
       validate();
     })
@@ -525,6 +655,14 @@ function init() {
   );
 
   el.date.addEventListener("change", () => {
+    refreshSettlementDate({ force: true });
+    loadFxForDate();
+    validate();
+  });
+
+  el.settlementDate.addEventListener("change", () => {
+    el.settlementDate.dataset.auto = "false";
+    refreshSettlementDate();
     loadFxForDate();
     validate();
   });
