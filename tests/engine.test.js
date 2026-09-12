@@ -1,0 +1,168 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+
+import {
+  EngineError,
+  annualSummary,
+  calculateTax,
+  replay,
+  simulate,
+} from "../static/engine.js";
+
+function buy(ticker, date, quantity, priceUsd, fxRate, feeUsd = 0, id = "") {
+  return {
+    id,
+    type: "buy",
+    ticker,
+    date,
+    quantity,
+    price_usd: priceUsd,
+    fee_usd: feeUsd,
+    fx_rate: fxRate,
+  };
+}
+
+function sell(ticker, date, quantity, priceUsd, fxRate, feeUsd = 0, id = "") {
+  return { ...buy(ticker, date, quantity, priceUsd, fxRate, feeUsd, id), type: "sell" };
+}
+
+test("이동평균 취득가액은 매수일별 환율로 환산해 누적된다", () => {
+  const { holdings } = replay([
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    buy("AAPL", "2026-03-10", 10, 100, 1400),
+  ]);
+
+  assert.equal(holdings.get("AAPL").quantity, 20);
+  assert.equal(holdings.get("AAPL").totalCostKrw, 2_700_000);
+  assert.equal(holdings.get("AAPL").avgCostKrw, 135_000);
+});
+
+test("매도는 평균단가로 취득가액을 대응시키고 평균단가는 변하지 않는다", () => {
+  const { holdings, sales } = replay([
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    buy("AAPL", "2026-03-10", 10, 100, 1400),
+    sell("AAPL", "2026-06-10", 5, 120, 1450),
+  ]);
+
+  assert.equal(sales[0].proceedsKrw, 870_000);
+  assert.equal(sales[0].costKrw, 675_000);
+  assert.equal(sales[0].gainKrw, 195_000);
+  assert.equal(holdings.get("AAPL").quantity, 15);
+  assert.equal(holdings.get("AAPL").avgCostKrw, 135_000);
+});
+
+test("입력 순서와 무관하게 날짜순으로 재계산된다", () => {
+  const { holdings } = replay([
+    buy("AAPL", "2026-03-10", 10, 100, 1400),
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+  ]);
+
+  assert.equal(holdings.get("AAPL").avgCostKrw, 135_000);
+});
+
+test("매수수수료는 취득가액에 가산되고 매도수수료는 양도가액에서 차감된다", () => {
+  const { holdings, sales } = replay([
+    buy("AAPL", "2026-01-10", 10, 100, 1300, 10),
+    sell("AAPL", "2026-06-10", 10, 100, 1300, 10),
+  ]);
+
+  assert.equal(holdings.get("AAPL").quantity, 0);
+  assert.equal(sales[0].costKrw, 1_313_000);
+  assert.equal(sales[0].proceedsKrw, 1_287_000);
+  assert.equal(sales[0].gainKrw, -26_000);
+});
+
+test("보유수량을 초과해 매도하면 오류", () => {
+  assert.throws(
+    () => replay([buy("AAPL", "2026-01-10", 5, 100, 1300), sell("AAPL", "2026-02-10", 6, 100, 1300)]),
+    EngineError
+  );
+});
+
+test("기본공제 후 22% 세율이 적용된다", () => {
+  const result = calculateTax(10_000_000);
+
+  assert.equal(result.deductionKrw, 2_500_000);
+  assert.equal(result.taxableBaseKrw, 7_500_000);
+  assert.equal(result.incomeTaxKrw, 1_500_000);
+  assert.equal(result.localTaxKrw, 150_000);
+  assert.equal(result.totalTaxKrw, 1_650_000);
+});
+
+test("기본공제 이하 차익은 과세되지 않는다", () => {
+  const result = calculateTax(2_000_000);
+
+  assert.equal(result.deductionKrw, 2_000_000);
+  assert.equal(result.taxableBaseKrw, 0);
+  assert.equal(result.totalTaxKrw, 0);
+});
+
+test("연간 손실은 과세되지 않고 다음 해로 이월되지 않는다", () => {
+  const losingYear = [
+    buy("AAPL", "2025-01-10", 10, 100, 1300),
+    sell("AAPL", "2025-06-10", 10, 50, 1300),
+  ];
+  const nextYear = [
+    ...losingYear,
+    buy("MSFT", "2026-01-10", 10, 100, 1300),
+    sell("MSFT", "2026-06-10", 10, 200, 1300),
+  ];
+
+  const tax2025 = annualSummary(losingYear, 2025).tax;
+  const tax2026 = annualSummary(nextYear, 2026).tax;
+
+  assert.equal(tax2025.totalGainKrw, -650_000);
+  assert.equal(tax2025.totalTaxKrw, 0);
+  assert.equal(tax2026.totalGainKrw, 1_300_000);
+  assert.equal(tax2026.deductionKrw, 1_300_000);
+});
+
+test("같은 해 안에서는 종목 간 손익이 통산된다", () => {
+  const { yearSales, tax } = annualSummary(
+    [
+      buy("AAPL", "2026-01-10", 10, 100, 1300),
+      sell("AAPL", "2026-06-10", 10, 200, 1300),
+      buy("MSFT", "2026-01-10", 10, 100, 1300),
+      sell("MSFT", "2026-07-10", 10, 50, 1300),
+    ],
+    2026
+  );
+
+  assert.equal(yearSales.length, 2);
+  assert.equal(tax.totalGainKrw, 650_000);
+  assert.equal(tax.totalTaxKrw, 0);
+});
+
+test("시뮬레이션은 확정 거래 대비 추가 세액을 보여준다", () => {
+  const confirmed = [
+    buy("AAPL", "2026-01-10", 100, 100, 1300),
+    sell("AAPL", "2026-06-10", 20, 200, 1300),
+  ];
+  const virtual = [sell("AAPL", "2026-09-12", 20, 300, 1400, 0, "sim-1")];
+
+  const result = simulate(confirmed, virtual, 2026);
+
+  assert.equal(result.before.totalGainKrw, 2_600_000);
+  assert.equal(result.simulatedGainKrw, 5_800_000);
+  assert.equal(result.after.totalGainKrw, 8_400_000);
+  assert.equal(result.additionalTaxKrw, result.after.totalTaxKrw - result.before.totalTaxKrw);
+});
+
+test("과거 거래의 적용환율을 고치면 이후 계산이 전부 다시 반영된다", () => {
+  const transactions = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300, 0, "tx-1"),
+    buy("AAPL", "2026-03-10", 10, 100, 1400, 0, "tx-2"),
+    sell("AAPL", "2026-06-10", 5, 120, 1450, 0, "tx-3"),
+  ];
+
+  const beforeFix = annualSummary(transactions, 2026);
+  assert.equal(beforeFix.holdings.get("AAPL").avgCostKrw, 135_000);
+  assert.equal(beforeFix.tax.totalGainKrw, 195_000);
+
+  const corrected = transactions.map((tx) => (tx.id === "tx-1" ? { ...tx, fx_rate: 1200 } : tx));
+  const afterFix = annualSummary(corrected, 2026);
+
+  assert.equal(afterFix.holdings.get("AAPL").avgCostKrw, 130_000);
+  assert.equal(afterFix.yearSales[0].costKrw, 650_000);
+  assert.equal(afterFix.tax.totalGainKrw, 220_000);
+});
