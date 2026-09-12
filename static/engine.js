@@ -186,12 +186,31 @@ export function calculateTax(totalGainKrw) {
   };
 }
 
-/** 해당 연도 기준 보유현황, 실현 매도 내역, 세액을 함께 반환한다. */
+/**
+ * 해당 연도 기준 보유현황, 실현 매도 내역, 세액을 함께 반환한다.
+ *
+ * 기본공제는 매도 건마다 차감되는 게 아니라, 그 해 매도를 전부 합산한
+ * 뒤(손익통산) 연 1회만 적용된다.
+ */
 export function annualSummary(transactions, year) {
   const { holdings, sales } = replay(transactions);
   const yearSales = sales.filter((s) => s.date.slice(0, 4) === String(year));
   const totalGain = yearSales.reduce((sum, s) => sum + s.gainKrw, 0);
   return { holdings, yearSales, tax: calculateTax(totalGain) };
+}
+
+export const TAX_FREE_HEADROOM_LABEL = "올해 세금 없이 추가로 실현 가능한 이익";
+
+/**
+ * 올해 추가로 실현해도 세금이 붙지 않는 이익 금액.
+ *
+ * "남은 기본공제"라고 부르면 250만원이 상한인 것처럼 읽히지만, 이미 손실을
+ * 실현해 둔 해에는 그 손실만큼 이익을 더 얹어도 통산되어 세금이 없다.
+ * 그래서 상한이 아니라 실제 여유분을 계산한다.
+ */
+export function taxFreeHeadroomKrw(transactions, year) {
+  const { tax } = annualSummary(transactions, year);
+  return Math.max(0, BASIC_DEDUCTION_KRW - tax.totalGainKrw);
 }
 
 /**

@@ -9,6 +9,7 @@ import {
   maxSellableQuantity,
   replay,
   simulate,
+  taxFreeHeadroomKrw,
 } from "../static/engine.js";
 
 function buy(ticker, date, quantity, priceUsd, fxRate, feeUsd = 0, id = "") {
@@ -206,6 +207,59 @@ test("같은 해 안에서는 종목 간 손익이 통산된다", () => {
   assert.equal(yearSales.length, 2);
   assert.equal(tax.totalGainKrw, 650_000);
   assert.equal(tax.totalTaxKrw, 0);
+});
+
+test("기본공제는 매도 건마다가 아니라 연간 합산 후 한 번만 적용된다", () => {
+  const threeSalesOfOneMillionEach = [
+    buy("AAPL", "2026-01-10", 30, 100, 1300),
+    sell("AAPL", "2026-03-10", 10, 100 + 1_000_000 / 10 / 1300, 1300),
+    sell("AAPL", "2026-06-10", 10, 100 + 1_000_000 / 10 / 1300, 1300),
+    sell("AAPL", "2026-09-10", 10, 100 + 1_000_000 / 10 / 1300, 1300),
+  ];
+
+  const { yearSales, tax } = annualSummary(threeSalesOfOneMillionEach, 2026);
+
+  assert.equal(yearSales.length, 3);
+  yearSales.forEach((sale) => assert.equal(Math.round(sale.gainKrw), 1_000_000));
+
+  // 건별 적용이었다면 각 100만원이 전부 공제되어 세액 0원이 됐을 것이다.
+  assert.equal(tax.totalGainKrw, 3_000_000);
+  assert.equal(tax.deductionKrw, 2_500_000);
+  assert.equal(tax.taxableBaseKrw, 500_000);
+  assert.equal(tax.totalTaxKrw, 110_000);
+});
+
+test("세금 없이 추가 실현 가능한 이익은 실현손익에 따라 달라진다", () => {
+  const nothingRealizedYet = [buy("AAPL", "2026-01-10", 10, 100, 1300)];
+  assert.equal(taxFreeHeadroomKrw(nothingRealizedYet, 2026), 2_500_000);
+
+  const gained1M = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    sell("AAPL", "2026-03-10", 10, 100 + 1_000_000 / 10 / 1300, 1300),
+  ];
+  assert.equal(taxFreeHeadroomKrw(gained1M, 2026), 1_500_000);
+
+  const gained3M = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    sell("AAPL", "2026-03-10", 10, 100 + 3_000_000 / 10 / 1300, 1300),
+  ];
+  assert.equal(taxFreeHeadroomKrw(gained3M, 2026), 0);
+});
+
+test("이미 손실을 실현한 해에는 250만원보다 많이 실현해도 세금이 없다", () => {
+  const lost3M = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    sell("AAPL", "2026-03-10", 10, 100 - 3_000_000 / 10 / 1300, 1300),
+  ];
+
+  assert.equal(taxFreeHeadroomKrw(lost3M, 2026), 5_500_000);
+
+  const afterRealizing5_5M = [
+    ...lost3M,
+    buy("MSFT", "2026-04-10", 10, 100, 1300),
+    sell("MSFT", "2026-05-10", 10, 100 + 5_500_000 / 10 / 1300, 1300),
+  ];
+  assert.equal(annualSummary(afterRealizing5_5M, 2026).tax.totalTaxKrw, 0);
 });
 
 test("시뮬레이션은 확정 거래 대비 추가 세액을 보여준다", () => {
