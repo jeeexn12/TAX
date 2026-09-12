@@ -1,6 +1,19 @@
 import { EngineError, canAddTransaction, replay, sellableInfo } from "./engine.js";
+import {
+  DCA_DISCLAIMER,
+  buildLots,
+  clampRange,
+  nextStartDate,
+  scheduledDates,
+} from "./dca.js";
 import { initHoldings, refreshHoldings } from "./holdings.js";
-import { addTransaction, deleteTransaction, loadTransactions } from "./storage.js";
+import {
+  addTransaction,
+  addTransactions,
+  deleteTransaction,
+  loadTransactions,
+  updateTransaction,
+} from "./storage.js";
 
 const TYPE_LABELS = { buy: "매수", sell: "매도", split: "주식분할" };
 
@@ -24,16 +37,40 @@ const el = {
   tableBody: document.querySelector("#tx-table tbody"),
   tableEmpty: document.getElementById("tx-empty"),
   count: document.getElementById("tx-count"),
+  approxNote: document.getElementById("tx-approx-note"),
+  dcaAmount: document.getElementById("dca-amount"),
+  dcaAmountHint: document.getElementById("dca-amount-hint"),
+  dcaStart: document.getElementById("dca-start"),
+  dcaEnd: document.getElementById("dca-end"),
+  dcaRangeHint: document.getElementById("dca-range-hint"),
+  dcaCard: document.getElementById("dca-preview-card"),
+  dcaCount: document.getElementById("dca-preview-count"),
+  dcaDisclaimer: document.getElementById("dca-disclaimer"),
+  dcaNote: document.getElementById("dca-preview-note"),
+  dcaBody: document.querySelector("#dca-preview-table tbody"),
+  dcaSave: document.getElementById("dca-save"),
+  dcaCancel: document.getElementById("dca-cancel"),
 };
 
 let transactions = loadTransactions();
 let fxAppliedDate = null;
 let fxRequestToken = 0;
+let dcaPreview = null;
+let editingId = null;
 
 const number = (value, digits = 0) =>
   Number(value).toLocaleString("ko-KR", { maximumFractionDigits: digits });
+const won = (value) => `₩${Math.round(value).toLocaleString("ko-KR")}`;
+const today = () => new Date().toISOString().slice(0, 10);
 
 const selectedType = () => document.querySelector('input[name="type"]:checked').value;
+const selectedCurrency = () => document.querySelector('input[name="currency"]:checked').value;
+const selectedFrequency = () => document.querySelector('input[name="frequency"]:checked').value;
+
+function dateKr(iso) {
+  const [, m, d] = iso.split("-");
+  return `${Number(m)}월 ${Number(d)}일`;
+}
 
 function setupTabs() {
   document.querySelectorAll(".tab").forEach((tab) => {
@@ -48,15 +85,25 @@ function setupTabs() {
 }
 
 function applyTypeVisibility() {
-  const isSplit = selectedType() === "split";
-  document.querySelectorAll('[data-only="trade"]').forEach((node) => (node.hidden = isSplit));
-  document.querySelectorAll('[data-only="split"]').forEach((node) => (node.hidden = !isSplit));
-  el.submit.textContent = isSplit ? "주식분할 추가" : "거래 추가";
+  const type = selectedType();
+  const show = (selector, visible) =>
+    document.querySelectorAll(selector).forEach((node) => (node.hidden = !visible));
+
+  show('[data-only="single"]', type !== "dca");
+  show('[data-only="trade"]', type === "buy" || type === "sell");
+  show('[data-only="split"]', type === "split");
+  show('[data-only="dca"]', type === "dca");
+
+  el.submit.textContent =
+    type === "dca" ? "미리보기 만들기" : type === "split" ? "주식분할 추가" : "거래 추가";
+
+  if (type !== "dca") hidePreview();
 }
 
 async function loadFxForDate() {
   const date = el.date.value;
-  if (!date || selectedType() === "split" || el.fxManual.checked) return;
+  if (!date || selectedType() !== "buy" && selectedType() !== "sell") return;
+  if (el.fxManual.checked) return;
 
   const token = ++fxRequestToken;
   el.fxNote.textContent = "고시환율 조회 중…";
@@ -73,9 +120,8 @@ async function loadFxForDate() {
     el.fxRate.value = data.rate;
     fxAppliedDate = data.applied_date;
 
-    const isFuture = date > new Date().toISOString().slice(0, 10);
-    if (isFuture) {
-      el.fxNote.textContent = `아직 고시되지 않은 날짜입니다. 최신 고시환율(${date_kr(
+    if (date > today()) {
+      el.fxNote.textContent = `아직 고시되지 않은 날짜입니다. 최신 고시환율(${dateKr(
         data.applied_date
       )})을 임시로 넣었으니, 실제 매도 후 그날 환율로 정정하세요.`;
       el.fxNote.className = "hint is-warning";
@@ -118,25 +164,16 @@ function updateSellNotice(info) {
   if (info.max === 0) {
     el.sellNotice.textContent = limit
       ? `이 날짜에는 0주만 매도 가능합니다.${reason}`
-      : `${date_kr(el.date.value)} 기준 보유수량이 없습니다.`;
+      : `${dateKr(el.date.value)} 기준 보유수량이 없습니다.`;
   } else {
     el.sellNotice.textContent = `이 날짜에 최대 ${number(info.max, 8)}주까지 매도 가능합니다.${reason}`;
   }
   el.sellNotice.hidden = false;
 }
 
-function date_kr(iso) {
-  const [, m, d] = iso.split("-");
-  return `${Number(m)}월 ${Number(d)}일`;
-}
-
 function buildTransaction() {
   const type = selectedType();
-  const base = {
-    type,
-    ticker: el.ticker.value.trim().toUpperCase(),
-    date: el.date.value,
-  };
+  const base = { type, ticker: el.ticker.value.trim().toUpperCase(), date: el.date.value };
 
   if (type === "split") return { ...base, ratio: Number(el.ratio.value) };
 
@@ -148,12 +185,23 @@ function buildTransaction() {
     fx_rate: Number(el.fxRate.value),
     fx_applied_date: el.fxManual.checked ? null : fxAppliedDate,
     fx_manual: el.fxManual.checked,
+    source: "manual",
   };
 }
 
 function findError() {
   const type = selectedType();
   if (!el.ticker.value.trim()) return "티커를 입력해주세요.";
+
+  if (type === "dca") {
+    if (!(Number(el.dcaAmount.value) > 0)) return "1회 매수금액을 입력해주세요.";
+    if (!el.dcaStart.value) return "시작일을 입력해주세요.";
+    if (!el.dcaEnd.value) return "종료일을 입력해주세요.";
+    if (el.dcaEnd.value < el.dcaStart.value) return "종료일이 시작일보다 빠릅니다.";
+    if (el.dcaStart.value > today()) return "시작일이 미래입니다.";
+    return null;
+  }
+
   if (!el.date.value) return "거래일을 입력해주세요.";
 
   if (type === "split") {
@@ -174,12 +222,14 @@ function findError() {
 }
 
 function validate() {
+  const type = selectedType();
   updateSellNotice(describeSellable());
 
   const hasEnoughInput =
     el.ticker.value.trim() &&
-    el.date.value &&
-    (selectedType() === "split" ? el.ratio.value : el.quantity.value);
+    (type === "dca"
+      ? el.dcaAmount.value && el.dcaStart.value && el.dcaEnd.value
+      : el.date.value && (type === "split" ? el.ratio.value : el.quantity.value));
 
   const error = findError();
   const blocked = Boolean(error);
@@ -189,7 +239,127 @@ function validate() {
   el.formError.textContent = message ?? "";
   el.formError.hidden = !showError;
   el.submit.disabled = blocked;
-  el.sellNotice.classList.toggle("is-blocked", blocked && hasEnoughInput && selectedType() === "sell");
+  el.sellNotice.classList.toggle("is-blocked", blocked && hasEnoughInput && type === "sell");
+}
+
+function applyRangeLimit() {
+  el.dcaAmountHint.textContent =
+    selectedCurrency() === "KRW"
+      ? "회차마다 이 금액(원)어치를 매수합니다."
+      : "회차마다 이 금액(달러)어치를 매수합니다.";
+
+  const { end, clamped } = clampRange(el.dcaStart.value, el.dcaEnd.value);
+  if (clamped) {
+    el.dcaEnd.value = end;
+    el.dcaRangeHint.textContent = `한 번에 최대 1년까지 생성됩니다. 종료일을 ${end}로 맞췄습니다. 더 긴 기간은 1년 단위로 나눠서 넣어주세요.`;
+    el.dcaRangeHint.className = "hint is-warning";
+  } else {
+    el.dcaRangeHint.textContent = "한 번에 최대 1년까지 생성됩니다.";
+    el.dcaRangeHint.className = "hint";
+  }
+}
+
+function hidePreview() {
+  dcaPreview = null;
+  el.dcaCard.hidden = true;
+}
+
+async function buildPreview() {
+  const ticker = el.ticker.value.trim().toUpperCase();
+  const amount = Number(el.dcaAmount.value);
+  const currency = selectedCurrency();
+  const frequency = selectedFrequency();
+  const start = el.dcaStart.value;
+  const end = el.dcaEnd.value;
+
+  el.submit.disabled = true;
+  el.submit.textContent = "조회 중… (최대 1분)";
+  el.formError.hidden = true;
+
+  try {
+    const response = await fetch(
+      `/api/history?ticker=${encodeURIComponent(ticker)}&start=${start}&end=${end}`
+    );
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+
+    const byDate = new Map(data.rows.map((row) => [row.date, row]));
+    const picked = scheduledDates({
+      start,
+      end,
+      frequency,
+      tradingDates: data.rows.map((row) => row.date),
+    });
+    const rows = picked.map((d) => byDate.get(d));
+    const lots = buildLots({ ticker, currency, amount, rows });
+
+    dcaPreview = { lots, rows, start, end, requested: data.rows.length };
+    renderPreview();
+  } catch (err) {
+    el.formError.textContent = err.message;
+    el.formError.hidden = false;
+  } finally {
+    el.submit.textContent = "미리보기 만들기";
+    validate();
+  }
+}
+
+function renderPreview() {
+  const { lots, rows, start, end, requested } = dcaPreview;
+  el.dcaDisclaimer.textContent = DCA_DISCLAIMER;
+
+  el.dcaBody.innerHTML = "";
+  lots.forEach((lot, i) => {
+    const row = document.createElement("tr");
+    row.innerHTML = `
+      <td>${lot.date}</td>
+      <td class="num">${number(lot.price_usd, 4)}</td>
+      <td class="num">${number(lot.fx_rate, 2)}${
+        rows[i].fx_is_fallback ? `<br /><small class="muted">${dateKr(rows[i].fx_applied_date)} 고시</small>` : ""
+      }</td>
+      <td class="num">${number(lot.quantity, 6)}</td>
+      <td class="num">${won(lot.price_usd * lot.quantity * lot.fx_rate)}</td>`;
+    el.dcaBody.appendChild(row);
+  });
+
+  const totalKrw = lots.reduce((sum, lot) => sum + lot.price_usd * lot.quantity * lot.fx_rate, 0);
+  el.dcaCount.textContent = `${lots.length}건 · 합계 ${won(totalKrw)}`;
+
+  const calendarDays = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
+  const notes = [`${start}~${end} 달력 ${calendarDays}일 중 거래일은 ${requested}일이었습니다.`];
+  if (selectedFrequency() === "weekly") {
+    notes.push(`매주 기준으로 ${lots.length}회차를 골랐습니다.`);
+  }
+  const fallbacks = rows.filter((row) => row.fx_is_fallback).length;
+  if (fallbacks) {
+    notes.push(`${fallbacks}건은 그날 고시가 없어 직전 영업일 환율을 적용했습니다.`);
+  }
+  if (end > today()) notes.push("종료일이 미래라 오늘까지만 생성했습니다.");
+
+  el.dcaNote.textContent = notes.join(" ");
+  el.dcaNote.hidden = false;
+  el.dcaSave.textContent = `${lots.length}건 저장`;
+  el.dcaSave.disabled = lots.length === 0;
+  el.dcaCard.hidden = false;
+}
+
+function savePreview() {
+  const lots = dcaPreview.lots;
+  addTransactions(lots);
+  transactions = loadTransactions();
+
+  const next = nextStartDate(lots);
+  hidePreview();
+  el.dcaStart.value = next;
+  el.dcaEnd.value = "";
+  el.dcaAmount.focus();
+
+  el.formError.className = "notice";
+  el.formError.textContent = `${lots.length}건을 저장했습니다. 이어서 넣으실 수 있도록 다음 시작일을 ${next}로 채웠습니다. 종료일만 정하고 다시 미리보기를 만드세요.`;
+  el.formError.hidden = false;
+
+  renderTable();
+  refreshHoldings(transactions);
 }
 
 function renderTable() {
@@ -197,24 +367,93 @@ function renderTable() {
 
   el.tableBody.innerHTML = "";
   for (const tx of sorted) {
-    const row = document.createElement("tr");
-    const isSplit = tx.type === "split";
-
-    row.innerHTML = `
-      <td>${tx.date}</td>
-      <td><span class="pill pill-${tx.type}">${TYPE_LABELS[tx.type]}</span></td>
-      <td class="ticker">${tx.ticker}</td>
-      <td class="num">${isSplit ? `${number(tx.ratio, 4)}배` : number(tx.quantity, 8)}</td>
-      <td class="num">${isSplit ? "—" : number(tx.price_usd, 4)}</td>
-      <td class="num">${isSplit ? "—" : number(tx.fee_usd, 4)}</td>
-      <td class="num">${isSplit ? "—" : number(tx.fx_rate, 2) + (tx.fx_manual ? " ✎" : "")}</td>
-      <td class="num"><button type="button" class="link-danger" data-delete="${tx.id}">삭제</button></td>
-    `;
-    el.tableBody.appendChild(row);
+    el.tableBody.appendChild(tx.id === editingId ? editRow(tx) : readRow(tx));
   }
 
   el.tableEmpty.hidden = transactions.length > 0;
   el.count.textContent = transactions.length ? `${transactions.length}건` : "";
+
+  const hasDca = transactions.some((tx) => tx.source === "dca" && !tx.corrected);
+  el.approxNote.textContent = `자동생성된 로트가 있습니다. ${DCA_DISCLAIMER}`;
+  el.approxNote.hidden = !hasDca;
+}
+
+function readRow(tx) {
+  const row = document.createElement("tr");
+  const isSplit = tx.type === "split";
+  const badge =
+    tx.source === "dca"
+      ? `<span class="tag ${tx.corrected ? "tag-fixed" : ""}">${tx.corrected ? "정정됨" : "자동생성"}</span>`
+      : "";
+
+  row.innerHTML = `
+    <td>${tx.date}</td>
+    <td><span class="pill pill-${tx.type}">${TYPE_LABELS[tx.type]}</span>${badge}</td>
+    <td class="ticker">${tx.ticker}</td>
+    <td class="num">${isSplit ? `${number(tx.ratio, 4)}배` : number(tx.quantity, 8)}</td>
+    <td class="num">${isSplit ? "—" : number(tx.price_usd, 4)}</td>
+    <td class="num">${isSplit ? "—" : number(tx.fee_usd, 4)}</td>
+    <td class="num">${isSplit ? "—" : number(tx.fx_rate, 2) + (tx.fx_manual ? " ✎" : "")}</td>
+    <td class="num row-actions">
+      ${isSplit ? "" : `<button type="button" class="link" data-edit="${tx.id}">정정</button>`}
+      <button type="button" class="link-danger" data-delete="${tx.id}">삭제</button>
+    </td>`;
+  return row;
+}
+
+function editRow(tx) {
+  const row = document.createElement("tr");
+  row.className = "is-editing";
+  row.innerHTML = `
+    <td>${tx.date}</td>
+    <td><span class="pill pill-${tx.type}">${TYPE_LABELS[tx.type]}</span></td>
+    <td class="ticker">${tx.ticker}</td>
+    <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${tx.quantity}" data-field="quantity" /></td>
+    <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${tx.price_usd}" data-field="price_usd" /></td>
+    <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${tx.fee_usd}" data-field="fee_usd" /></td>
+    <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${tx.fx_rate}" data-field="fx_rate" /></td>
+    <td class="num row-actions">
+      <button type="button" class="link" data-save="${tx.id}">저장</button>
+      <button type="button" class="link" data-cancel="1">취소</button>
+    </td>`;
+  return row;
+}
+
+function commitEdit(id) {
+  const row = el.tableBody.querySelector("tr.is-editing");
+  const fields = {};
+  row.querySelectorAll("[data-field]").forEach((input) => {
+    fields[input.dataset.field] = Number(input.value);
+  });
+
+  if (!(fields.quantity > 0) || !(fields.fx_rate > 0) || !(fields.price_usd >= 0)) {
+    showRowError("수량과 환율은 0보다 커야 하고, 단가는 0 이상이어야 합니다.");
+    return;
+  }
+
+  const candidate = transactions.map((tx) => (tx.id === id ? { ...tx, ...fields } : tx));
+  try {
+    replay(candidate);
+  } catch (err) {
+    if (err instanceof EngineError) {
+      showRowError(`이렇게 고치면 이후 거래가 성립하지 않습니다. ${err.message}`);
+      return;
+    }
+    throw err;
+  }
+
+  updateTransaction(id, { ...fields, fx_manual: true, corrected: true });
+  transactions = loadTransactions();
+  editingId = null;
+  el.formError.hidden = true;
+  renderTable();
+  refreshHoldings(transactions);
+}
+
+function showRowError(message) {
+  el.formError.className = "error";
+  el.formError.textContent = message;
+  el.formError.hidden = false;
 }
 
 function handleDelete(id) {
@@ -223,8 +462,7 @@ function handleDelete(id) {
     replay(remaining);
   } catch (err) {
     if (err instanceof EngineError) {
-      el.formError.textContent = `이 거래를 지우면 이후 거래가 성립하지 않습니다. ${err.message}`;
-      el.formError.hidden = false;
+      showRowError(`이 거래를 지우면 이후 거래가 성립하지 않습니다. ${err.message}`);
       return;
     }
     throw err;
@@ -245,6 +483,13 @@ function handleSubmit(event) {
     return;
   }
 
+  el.formError.className = "error";
+
+  if (selectedType() === "dca") {
+    buildPreview();
+    return;
+  }
+
   addTransaction(buildTransaction());
   transactions = loadTransactions();
 
@@ -260,14 +505,22 @@ function handleSubmit(event) {
 
 function init() {
   setupTabs();
-  el.date.value = new Date().toISOString().slice(0, 10);
+  el.date.value = today();
   applyTypeVisibility();
+  applyRangeLimit();
 
   document.querySelectorAll('input[name="type"]').forEach((radio) =>
     radio.addEventListener("change", () => {
       applyTypeVisibility();
       loadFxForDate();
       validate();
+    })
+  );
+
+  document.querySelectorAll('input[name="currency"], input[name="frequency"]').forEach((radio) =>
+    radio.addEventListener("change", () => {
+      applyRangeLimit();
+      hidePreview();
     })
   );
 
@@ -288,15 +541,35 @@ function init() {
     validate();
   });
 
-  [el.ticker, el.quantity, el.price, el.fee, el.ratio, el.fxRate].forEach((input) =>
+  [el.ticker, el.quantity, el.price, el.fee, el.ratio, el.fxRate, el.dcaAmount].forEach((input) =>
     input.addEventListener("input", validate)
   );
 
+  [el.dcaStart, el.dcaEnd].forEach((input) =>
+    input.addEventListener("change", () => {
+      applyRangeLimit();
+      hidePreview();
+      validate();
+    })
+  );
+
   el.tableBody.addEventListener("click", (event) => {
-    const id = event.target.dataset?.delete;
-    if (id) handleDelete(id);
+    const { delete: deleteId, edit, save, cancel } = event.target.dataset;
+    if (deleteId) handleDelete(deleteId);
+    else if (edit) {
+      editingId = edit;
+      el.formError.hidden = true;
+      renderTable();
+    } else if (save) commitEdit(save);
+    else if (cancel) {
+      editingId = null;
+      el.formError.hidden = true;
+      renderTable();
+    }
   });
 
+  el.dcaSave.addEventListener("click", savePreview);
+  el.dcaCancel.addEventListener("click", hidePreview);
   el.form.addEventListener("submit", handleSubmit);
 
   renderTable();

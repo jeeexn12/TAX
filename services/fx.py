@@ -9,6 +9,8 @@ from __future__ import annotations
 
 import json
 import os
+import threading
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
@@ -91,6 +93,64 @@ def _fetch_rate(d: date) -> float | None:
         if row.get("cur_unit") == "USD":
             return float(row["deal_bas_r"].replace(",", ""))
     return None
+
+
+_cache_lock = threading.Lock()
+BULK_WORKERS = 8
+
+
+def get_usd_krw_rates(target_dates: list[date], max_lookback_days: int = 10) -> dict[date, FxRate]:
+    """여러 날짜의 고시환율을 한 번에 조회한다.
+
+    수출입은행 API는 날짜당 1회 호출만 가능해서 1년치면 250회가 된다. 순차로
+    돌면 수십 초가 걸리므로 병렬로 받아오고, 캐시는 마지막에 한 번만 저장한다.
+    고시가 없는 날은 직전 영업일을 다시 조회해야 하므로 라운드를 반복한다.
+    """
+    today = date.today()
+    with _cache_lock:
+        cache = _load_cache()
+
+    def fetch_missing(candidates: set[date]) -> None:
+        pending = sorted(d for d in candidates if d.isoformat() not in cache)
+        if not pending:
+            return
+        with ThreadPoolExecutor(max_workers=BULK_WORKERS) as pool:
+            for d, rate in zip(pending, pool.map(_fetch_rate, pending)):
+                if rate is not None or d < today:
+                    cache[d.isoformat()] = rate
+
+    resolved: dict[date, FxRate] = {}
+    unresolved = {min(d, today) for d in target_dates}
+    fetch_missing(unresolved)
+
+    for _ in range(max_lookback_days):
+        still_missing: set[date] = set()
+        for original in target_dates:
+            if original in resolved:
+                continue
+            cursor = min(original, today)
+            for _ in range(max_lookback_days):
+                key = cursor.isoformat()
+                if key not in cache:
+                    still_missing.add(cursor)
+                    break
+                if cache[key] is not None:
+                    resolved[original] = FxRate(original, cursor, cache[key])
+                    break
+                cursor -= timedelta(days=1)
+        if not still_missing:
+            break
+        fetch_missing(still_missing)
+
+    with _cache_lock:
+        stored = _load_cache()
+        stored.update(cache)
+        _save_cache(stored)
+
+    missing = [d for d in target_dates if d not in resolved]
+    if missing:
+        raise FxLookupError(f"{missing[0].isoformat()} 등 {len(missing)}건의 고시환율을 찾을 수 없습니다.")
+    return resolved
 
 
 def get_usd_krw_rate(target_date: date, max_lookback_days: int = 10) -> FxRate:

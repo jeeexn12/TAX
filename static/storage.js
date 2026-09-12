@@ -118,8 +118,16 @@ export function validateTransactions(raw) {
       fx_rate: Number(tx.fx_rate),
       fx_applied_date: tx.fx_applied_date ?? null,
       fx_manual: Boolean(tx.fx_manual),
+      source: tx.source === "dca" ? "dca" : "manual",
+      corrected: Boolean(tx.corrected),
     };
   });
+}
+
+export function addTransactions(newTransactions) {
+  const saved = newTransactions.map((tx) => ({ ...tx, id: newId() }));
+  saveTransactions([...loadTransactions(), ...saved]);
+  return saved;
 }
 
 export function buildExportPayload(transactions = loadTransactions()) {
