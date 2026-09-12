@@ -817,6 +817,13 @@ tr.is-open td {
   margin: 0;
 }
 
+.copyright {
+  margin: 10px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #14161a;
