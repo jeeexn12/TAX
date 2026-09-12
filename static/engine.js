@@ -14,6 +14,11 @@ export const LOCAL_TAX_RATE = 0.1;
 
 const QTY_EPSILON = 1e-9;
 
+/** 국고금 관리법 제47조 제1항에 따른 10원 미만 끝수 절사. */
+function floorToTen(amount) {
+  return Math.floor(amount / 10) * 10;
+}
+
 export class EngineError extends Error {}
 
 export const COST_METHOD = { FIFO: "fifo", AVERAGE: "average" };
@@ -238,11 +243,12 @@ export function canAddTransaction(transactions, candidate, method = COST_METHOD.
  * 과세표준은 0이 된다.
  */
 export function calculateTax(totalGainKrw) {
+  // 국고금 관리법 제47조: 과세표준은 1원 미만, 세액은 10원 미만 끝수를 버린다.
   const gain = Math.trunc(totalGainKrw);
   const deduction = gain > 0 ? Math.min(BASIC_DEDUCTION_KRW, gain) : 0;
   const taxableBase = Math.max(0, gain - deduction);
-  const incomeTax = Math.trunc(taxableBase * INCOME_TAX_RATE);
-  const localTax = Math.trunc(incomeTax * LOCAL_TAX_RATE);
+  const incomeTax = floorToTen(taxableBase * INCOME_TAX_RATE);
+  const localTax = floorToTen(incomeTax * LOCAL_TAX_RATE);
 
   return {
     totalGainKrw: gain,
@@ -263,11 +269,17 @@ export function calculateTax(totalGainKrw) {
  * 기본공제는 매도 건마다 차감되는 게 아니라, 그 해 매도를 전부 합산한
  * 뒤(손익통산) 연 1회만 적용된다.
  */
-export function annualSummary(transactions, year, method = COST_METHOD.FIFO) {
+export function annualSummary(transactions, year, method = COST_METHOD.FIFO, domesticGainKrw = 0) {
   const { holdings, sales } = replay(transactions, method);
   const yearSales = sales.filter((s) => s.date.slice(0, 4) === String(year));
-  const totalGain = yearSales.reduce((sum, s) => sum + s.gainKrw, 0);
-  return { holdings, yearSales, tax: calculateTax(totalGain) };
+  const overseasGain = yearSales.reduce((sum, s) => sum + s.gainKrw, 0);
+  return {
+    holdings,
+    yearSales,
+    overseasGainKrw: overseasGain,
+    domesticGainKrw,
+    tax: calculateTax(overseasGain + domesticGainKrw),
+  };
 }
 
 /**
@@ -276,9 +288,9 @@ export function annualSummary(transactions, year, method = COST_METHOD.FIFO) {
  * 어느 쪽을 적용할지는 증권회사가 과세연도별로 계속 적용하는 방식에 달려 있어
  * 투자자가 고를 수 있는 것이 아니다. 그래서 고르라고 묻는 대신 차이만 보여준다.
  */
-export function compareMethods(transactions, year) {
-  const fifo = annualSummary(transactions, year, COST_METHOD.FIFO);
-  const average = annualSummary(transactions, year, COST_METHOD.AVERAGE);
+export function compareMethods(transactions, year, domesticGainKrw = 0) {
+  const fifo = annualSummary(transactions, year, COST_METHOD.FIFO, domesticGainKrw);
+  const average = annualSummary(transactions, year, COST_METHOD.AVERAGE, domesticGainKrw);
   const differenceKrw = fifo.tax.totalTaxKrw - average.tax.totalTaxKrw;
 
   return {
@@ -301,8 +313,8 @@ export const TAX_FREE_HEADROOM_LABEL = "올해 세금 없이 추가로 실현 �
  * 실현해 둔 해에는 그 손실만큼 이익을 더 얹어도 통산되어 세금이 없다.
  * 그래서 상한이 아니라 실제 여유분을 계산한다.
  */
-export function taxFreeHeadroomKrw(transactions, year, method = COST_METHOD.FIFO) {
-  const { tax } = annualSummary(transactions, year, method);
+export function taxFreeHeadroomKrw(transactions, year, method = COST_METHOD.FIFO, domesticGainKrw = 0) {
+  const { tax } = annualSummary(transactions, year, method, domesticGainKrw);
   return Math.max(0, BASIC_DEDUCTION_KRW - tax.totalGainKrw);
 }
 
@@ -346,9 +358,9 @@ export function fxSensitivity(transactions, virtualSales, year, { from, to, step
   return rows;
 }
 
-export function simulate(transactions, virtualSales, year, method = COST_METHOD.FIFO) {
-  const before = annualSummary(transactions, year, method).tax;
-  const withVirtual = annualSummary([...transactions, ...virtualSales], year, method);
+export function simulate(transactions, virtualSales, year, method = COST_METHOD.FIFO, domesticGainKrw = 0) {
+  const before = annualSummary(transactions, year, method, domesticGainKrw).tax;
+  const withVirtual = annualSummary([...transactions, ...virtualSales], year, method, domesticGainKrw);
   const after = withVirtual.tax;
 
   const virtualIds = new Set(virtualSales.map((v) => v.id));

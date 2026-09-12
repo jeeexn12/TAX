@@ -8,6 +8,7 @@
 from __future__ import annotations
 
 import json
+import re
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
@@ -50,14 +51,20 @@ class FxRate:
         return f"{self.applied_date.month}월 {self.applied_date.day}일 고시환율 적용"
 
 
+def cache_key(d: date, currency: str) -> str:
+    return f"{currency}:{d.isoformat()}"
+
+
 def _load_cache() -> dict[str, float | None]:
     if not CACHE_FILE.exists():
         return {}
     try:
         with CACHE_FILE.open(encoding="utf-8") as f:
-            return json.load(f)
+            raw = json.load(f)
     except (json.JSONDecodeError, OSError):
         return {}
+    # 통화 구분을 넣기 전에 저장된 항목은 전부 USD였다.
+    return {(k if ":" in k else f"USD:{k}"): v for k, v in raw.items()}
 
 
 def _save_cache(cache: dict[str, float | None]) -> None:
@@ -66,8 +73,20 @@ def _save_cache(cache: dict[str, float | None]) -> None:
         json.dump(cache, f, ensure_ascii=False, indent=2, sort_keys=True)
 
 
-def _fetch_rate(d: date) -> float | None:
-    """해당 날짜의 USD 매매기준율. 고시가 없는 날(주말/공휴일)이면 None."""
+def parse_cur_unit(cur_unit: str) -> tuple[str, int]:
+    """고시 통화코드를 (통화, 단위배수)로 나눈다.
+
+    엔화는 'JPY(100)', 루피아는 'IDR(100)'처럼 100단위로 고시된다. 배수를
+    무시하고 그대로 곱하면 취득가액이 100배로 부풀어 오르므로 반드시 나눠야 한다.
+    """
+    match = re.fullmatch(r"([A-Z]{3})(?:\((\d+)\))?", cur_unit.strip())
+    if not match:
+        return cur_unit.strip(), 1
+    return match.group(1), int(match.group(2) or 1)
+
+
+def _fetch_rate(d: date, currency: str = "USD") -> float | None:
+    """해당 날짜의 1통화당 원화 매매기준율. 고시가 없는 날(주말/공휴일)이면 None."""
     resp = requests.get(
         EXIM_URL,
         params={"authkey": EXIM_API_KEY, "searchdate": d.strftime("%Y%m%d"), "data": "AP01"},
@@ -90,8 +109,10 @@ def _fetch_rate(d: date) -> float | None:
         )
 
     for row in rows:
-        if row.get("cur_unit") == "USD":
-            return float(row["deal_bas_r"].replace(",", ""))
+        code, multiplier = parse_cur_unit(row.get("cur_unit", ""))
+        if code == currency:
+            quoted = float(row["deal_bas_r"].replace(",", ""))
+            return quoted / multiplier
     return None
 
 
@@ -99,7 +120,9 @@ _cache_lock = threading.Lock()
 BULK_WORKERS = 8
 
 
-def get_usd_krw_rates(target_dates: list[date], max_lookback_days: int = 10) -> dict[date, FxRate]:
+def get_usd_krw_rates(
+    target_dates: list[date], max_lookback_days: int = 10, currency: str = "USD"
+) -> dict[date, FxRate]:
     """여러 날짜의 고시환율을 한 번에 조회한다.
 
     수출입은행 API는 날짜당 1회 호출만 가능해서 1년치면 250회가 된다. 순차로
@@ -111,13 +134,14 @@ def get_usd_krw_rates(target_dates: list[date], max_lookback_days: int = 10) -> 
         cache = _load_cache()
 
     def fetch_missing(candidates: set[date]) -> None:
-        pending = sorted(d for d in candidates if d.isoformat() not in cache)
+        pending = sorted(d for d in candidates if cache_key(d, currency) not in cache)
         if not pending:
             return
         with ThreadPoolExecutor(max_workers=BULK_WORKERS) as pool:
-            for d, rate in zip(pending, pool.map(_fetch_rate, pending)):
+            rates = pool.map(lambda d: _fetch_rate(d, currency), pending)
+            for d, rate in zip(pending, rates):
                 if rate is not None or d < today:
-                    cache[d.isoformat()] = rate
+                    cache[cache_key(d, currency)] = rate
 
     resolved: dict[date, FxRate] = {}
     unresolved = {min(d, today) for d in target_dates}
@@ -130,7 +154,7 @@ def get_usd_krw_rates(target_dates: list[date], max_lookback_days: int = 10) -> 
                 continue
             cursor = min(original, today)
             for _ in range(max_lookback_days):
-                key = cursor.isoformat()
+                key = cache_key(cursor, currency)
                 if key not in cache:
                     still_missing.add(cursor)
                     break
@@ -153,7 +177,7 @@ def get_usd_krw_rates(target_dates: list[date], max_lookback_days: int = 10) -> 
     return resolved
 
 
-def get_usd_krw_rate(target_date: date, max_lookback_days: int = 10) -> FxRate:
+def get_usd_krw_rate(target_date: date, max_lookback_days: int = 10, currency: str = "USD") -> FxRate:
     """target_date 기준 매매기준율을 조회한다.
 
     고시가 없는 날짜면 직전 영업일 고시를 사용하고, 실제 적용된 고시일을
@@ -165,12 +189,12 @@ def get_usd_krw_rate(target_date: date, max_lookback_days: int = 10) -> FxRate:
 
     cursor = min(target_date, today)
     for _ in range(max_lookback_days):
-        key = cursor.isoformat()
+        key = cache_key(cursor, currency)
 
         if key in cache:
             rate = cache[key]
         else:
-            rate = _fetch_rate(cursor)
+            rate = _fetch_rate(cursor, currency)
             # 고시 없음(None)은 과거 날짜에 대해서만 캐시한다.
             # 오늘은 아직 고시 전(11시 이전)일 수 있어 나중에 값이 생긴다.
             if rate is not None or cursor < today:

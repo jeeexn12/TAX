@@ -174,6 +174,56 @@ test("기본공제 후 22% 세율이 적용된다", () => {
   assert.equal(result.totalTaxKrw, 1_650_000);
 });
 
+test("국내주식 손익은 해외주식과 통산되고 기본공제를 나눠 쓴다", () => {
+  const overseas = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    sell("AAPL", "2026-06-10", 10, 200, 1300), // +1,300,000
+  ];
+
+  const alone = annualSummary(overseas, 2026);
+  assert.equal(alone.tax.totalGainKrw, 1_300_000);
+  assert.equal(alone.tax.deductionKrw, 1_300_000); // 전액 공제로 흡수
+  assert.equal(alone.tax.totalTaxKrw, 0);
+
+  const withDomesticGain = annualSummary(overseas, 2026, COST_METHOD.FIFO, 4_000_000);
+  assert.equal(withDomesticGain.overseasGainKrw, 1_300_000);
+  assert.equal(withDomesticGain.domesticGainKrw, 4_000_000);
+  assert.equal(withDomesticGain.tax.totalGainKrw, 5_300_000);
+  assert.equal(withDomesticGain.tax.deductionKrw, 2_500_000); // 250만원을 함께 쓴다
+  assert.equal(withDomesticGain.tax.taxableBaseKrw, 2_800_000);
+  assert.equal(withDomesticGain.tax.totalTaxKrw, 616_000);
+});
+
+test("국내주식 손실은 해외주식 이익을 상계한다", () => {
+  const overseas = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    sell("AAPL", "2026-06-10", 10, 500, 1300), // +5,200,000
+  ];
+
+  const withDomesticLoss = annualSummary(overseas, 2026, COST_METHOD.FIFO, -3_000_000);
+
+  assert.equal(withDomesticLoss.tax.totalGainKrw, 2_200_000);
+  assert.equal(withDomesticLoss.tax.taxableBaseKrw, 0);
+  assert.equal(withDomesticLoss.tax.totalTaxKrw, 0);
+
+  // 국내 손실만큼 세금 없이 더 실현할 수 있다
+  assert.equal(taxFreeHeadroomKrw(overseas, 2026, COST_METHOD.FIFO, -3_000_000), 300_000);
+});
+
+test("과세표준은 1원 미만, 세액은 10원 미만 끝수를 버린다", () => {
+  // 국고금 관리법 제47조. 차익 5,123,456.78 -> 과세표준 2,623,456
+  const result = calculateTax(5_123_456.78);
+
+  assert.equal(result.totalGainKrw, 5_123_456);
+  assert.equal(result.taxableBaseKrw, 2_623_456);
+
+  // 2,623,456 x 20% = 524,691.2 -> 524,690
+  assert.equal(result.incomeTaxKrw, 524_690);
+  // 524,690 x 10% = 52,469 -> 52,460
+  assert.equal(result.localTaxKrw, 52_460);
+  assert.equal(result.totalTaxKrw, 577_150);
+});
+
 test("기본공제 이하 차익은 과세되지 않는다", () => {
   const result = calculateTax(2_000_000);
 

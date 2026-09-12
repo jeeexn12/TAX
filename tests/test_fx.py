@@ -23,8 +23,8 @@ def isolated_cache(tmp_path, monkeypatch):
 def fake_api(monkeypatch):
     calls = []
 
-    def _fetch(d):
-        calls.append(d)
+    def _fetch(d, currency="USD"):
+        calls.append((d, currency))
         return PUBLISHED.get(d)
 
     monkeypatch.setattr(fx, "_fetch_rate", _fetch)
@@ -77,8 +77,57 @@ def test_past_non_publication_days_are_cached_but_today_is_not(isolated_cache, f
     fx.get_usd_krw_rate(SATURDAY)
     cached = json.loads(isolated_cache.read_text(encoding="utf-8"))
 
-    assert cached["2026-09-11"] == 1338.2
-    assert "2026-09-12" not in cached
+    assert cached["USD:2026-09-11"] == 1338.2
+    assert "USD:2026-09-12" not in cached
+
+
+def test_cur_unit_multiplier_is_stripped():
+    assert fx.parse_cur_unit("USD") == ("USD", 1)
+    assert fx.parse_cur_unit("JPY(100)") == ("JPY", 100)
+    assert fx.parse_cur_unit("IDR(100)") == ("IDR", 100)
+    assert fx.parse_cur_unit("CNH") == ("CNH", 1)
+
+
+def test_hundred_unit_currencies_are_divided(isolated_cache, monkeypatch):
+    """엔화는 100엔당으로 고시된다. 그대로 쓰면 취득가액이 100배가 된다."""
+
+    class FakeResponse:
+        def raise_for_status(self):
+            pass
+
+        def json(self):
+            return [
+                {"result": 1, "cur_unit": "USD", "deal_bas_r": "1,338.2"},
+                {"result": 1, "cur_unit": "JPY(100)", "deal_bas_r": "866.49"},
+            ]
+
+    monkeypatch.setattr(fx.requests, "get", lambda *a, **k: FakeResponse())
+
+    assert fx._fetch_rate(FRIDAY, "USD") == 1338.2
+    assert fx._fetch_rate(FRIDAY, "JPY") == pytest.approx(8.6649)
+
+
+def test_cache_separates_currencies(isolated_cache, monkeypatch, frozen_today):
+    published = {("USD", FRIDAY): 1338.2, ("JPY", FRIDAY): 8.6649}
+    monkeypatch.setattr(fx, "_fetch_rate", lambda d, c="USD": published.get((c, d)))
+
+    assert fx.get_usd_krw_rate(FRIDAY, currency="USD").rate == 1338.2
+    assert fx.get_usd_krw_rate(FRIDAY, currency="JPY").rate == 8.6649
+
+    cached = json.loads(isolated_cache.read_text(encoding="utf-8"))
+    assert cached["USD:2026-09-11"] == 1338.2
+    assert cached["JPY:2026-09-11"] == 8.6649
+
+
+def test_legacy_cache_entries_are_read_as_usd(isolated_cache, monkeypatch, frozen_today):
+    isolated_cache.write_text(json.dumps({"2026-09-11": 1338.2}), encoding="utf-8")
+
+    def _fail(*args, **kwargs):
+        raise AssertionError("캐시에 있는 값을 다시 조회하면 안 된다")
+
+    monkeypatch.setattr(fx, "_fetch_rate", _fail)
+
+    assert fx.get_usd_krw_rate(FRIDAY).rate == 1338.2
 
 
 def test_api_error_code_raises(isolated_cache, monkeypatch, frozen_today):

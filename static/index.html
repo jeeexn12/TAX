@@ -256,6 +256,20 @@
             <output class="figure" id="headroom">—</output>
             <p class="hint">이 금액까지는 추가로 실현해도 세금이 없습니다.</p>
           </div>
+
+          <div class="summary-item">
+            <label class="label" for="domestic-gain">
+              올해 국내주식 양도손익
+              <em class="label-note">해당될 때만 입력 · 손실은 마이너스로</em>
+            </label>
+            <input id="domestic-gain" type="number" step="1" placeholder="0" />
+            <p class="hint">
+              국내주식과 해외주식은 소득세법 제94조제1항제3호로 함께 묶여 손익이 통산되고
+              기본공제 250만원도 나눠 씁니다. 다만 <b>대주주 요건 등에 해당하는 경우에만</b>
+              과세대상이니, 해당 여부를 먼저 확인하세요.
+            </p>
+            <p class="hint is-warning" id="domestic-warning" hidden></p>
+          </div>
         </div>
 
         <section class="card">
@@ -293,7 +307,7 @@
           </div>
           <p class="approx-note">
             적용 방법은 거래 증권사가 어느 방식을 계속 적용하는지에 따라 달라집니다.
-            증권사에 확인하세요. 투자자가 유리한 쪽을 골라 쓸 수 있는 것이 아닙니다.
+            증권사에 확인하세요.
           </p>
           <div id="compare-body"></div>
         </div>

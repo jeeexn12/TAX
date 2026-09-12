@@ -19,7 +19,11 @@ const el = {
   empty: document.getElementById("holdings-empty"),
   count: document.getElementById("holdings-count"),
   simPanel: document.getElementById("sim-panel"),
+  domesticGain: document.getElementById("domestic-gain"),
+  domesticWarning: document.getElementById("domestic-warning"),
 };
+
+const DOMESTIC_GAIN_KEY = "us-tax:domestic-gain";
 
 const won = (value) => `₩${Math.round(value).toLocaleString("ko-KR")}`;
 const signedWon = (value) =>
@@ -35,6 +39,7 @@ const dateKr = (iso) => {
 
 let transactions = [];
 let costMethod = COST_METHOD.FIFO;
+let domesticGainKrw = 0;
 let todayFxRate = null;
 const prices = new Map();
 const sim = new Map();
@@ -109,14 +114,26 @@ function activeHoldings() {
 
 function renderSummary() {
   const year = new Date().getFullYear();
-  const { tax } = annualSummary(transactions, year, costMethod);
+  const { tax, overseasGainKrw } = annualSummary(transactions, year, costMethod, domesticGainKrw);
 
   el.ytdGain.textContent = tax.totalGainKrw === 0 ? "—" : signedWon(tax.totalGainKrw);
   el.ytdTax.textContent =
-    tax.totalTaxKrw > 0
-      ? `확정 매도분 예상세액 ${won(tax.totalTaxKrw)}`
-      : "확정 매도분에 대한 세금은 없습니다.";
-  el.headroom.textContent = won(taxFreeHeadroomKrw(transactions, year, costMethod));
+    domesticGainKrw !== 0
+      ? `해외 ${signedWon(overseasGainKrw)} + 국내 ${signedWon(domesticGainKrw)} 통산` +
+        (tax.totalTaxKrw > 0 ? ` · 예상세액 ${won(tax.totalTaxKrw)}` : " · 세금 없음")
+      : tax.totalTaxKrw > 0
+        ? `확정 매도분 예상세액 ${won(tax.totalTaxKrw)}`
+        : "확정 매도분에 대한 세금은 없습니다.";
+  el.headroom.textContent = won(
+    taxFreeHeadroomKrw(transactions, year, costMethod, domesticGainKrw)
+  );
+
+  // 국내 대주주 30%, 비상장 중소기업 10% 등 20%가 아닌 물량이 섞이면
+  // 과세표준 x 22%로 떨어지지 않는다. 통산 효과만 믿고 세액을 그대로 쓰면 안 된다.
+  el.domesticWarning.hidden = domesticGainKrw === 0;
+  el.domesticWarning.textContent =
+    "국내주식분의 세율이 20%가 아닌 경우(대주주 1년 미만 30%, 비상장 중소기업 10% 등) " +
+    "합산 세액은 참고용입니다. 통산과 기본공제 효과만 반영되며, 물량별로 나눠 계산해야 합니다.";
 }
 
 function limitReason(limitedBy) {
@@ -165,7 +182,8 @@ function simResultHtml(holding) {
       },
     ],
     year,
-    costMethod
+    costMethod,
+    domesticGainKrw
   );
   const sale = outcome.simulatedSales[0];
 
@@ -349,6 +367,15 @@ export function refreshHoldings(latestTransactions, method = COST_METHOD.FIFO) {
 }
 
 export function initHoldings() {
+  domesticGainKrw = Number(localStorage.getItem(DOMESTIC_GAIN_KEY)) || 0;
+  if (domesticGainKrw) el.domesticGain.value = domesticGainKrw;
+
+  el.domesticGain.addEventListener("input", () => {
+    domesticGainKrw = Math.trunc(Number(el.domesticGain.value) || 0);
+    localStorage.setItem(DOMESTIC_GAIN_KEY, String(domesticGainKrw));
+    render();
+  });
+
   el.todayFxManual.addEventListener("change", () => {
     el.todayFx.disabled = !el.todayFxManual.checked;
     if (el.todayFxManual.checked) {
