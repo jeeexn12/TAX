@@ -2,3 +2,4 @@ flask
 yfinance
 python-dotenv
 requests
+pytest
