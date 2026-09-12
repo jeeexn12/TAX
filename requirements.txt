@@ -1,0 +1,4 @@
+flask
+yfinance
+python-dotenv
+requests
