@@ -15,6 +15,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab is-active" data-tab="input" role="tab">거래입력</button>
       <button class="tab" data-tab="holdings" role="tab">보유현황</button>
+      <button class="tab" data-tab="compare" role="tab">방법 비교</button>
       <button class="tab" data-tab="history" role="tab">내역</button>
     </nav>
 
@@ -268,7 +269,7 @@
                 <tr>
                   <th>티커</th>
                   <th class="num">보유수량</th>
-                  <th class="num">이동평균단가</th>
+                  <th class="num" id="avg-cost-header">이동평균단가</th>
                   <th class="num">취득가액</th>
                   <th class="num">적용 시세 (USD)</th>
                   <th class="num">평가금액</th>
@@ -282,6 +283,20 @@
           <p class="empty" id="holdings-empty">보유 중인 종목이 없습니다. 거래입력에서 매수를 먼저 넣어주세요.</p>
           <div id="sim-panel"></div>
         </section>
+      </section>
+
+      <section class="panel" data-panel="compare">
+        <div class="card">
+          <div class="card-head">
+            <h2>취득가액 계산방법 비교</h2>
+            <span class="count" id="compare-year"></span>
+          </div>
+          <p class="approx-note">
+            적용 방법은 거래 증권사가 어느 방식을 계속 적용하는지에 따라 달라집니다.
+            증권사에 확인하세요. 투자자가 유리한 쪽을 골라 쓸 수 있는 것이 아닙니다.
+          </p>
+          <div id="compare-body"></div>
+        </div>
       </section>
 
       <section class="panel" data-panel="history">

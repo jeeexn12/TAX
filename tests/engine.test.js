@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  COST_METHOD,
   EngineError,
   annualSummary,
   calculateTax,
@@ -50,11 +51,14 @@ test("이동평균 취득가액은 매수일별 환율로 환산해 누적된다
 });
 
 test("매도는 평균단가로 취득가액을 대응시키고 평균단가는 변하지 않는다", () => {
-  const { holdings, sales } = replay([
-    buy("AAPL", "2026-01-10", 10, 100, 1300),
-    buy("AAPL", "2026-03-10", 10, 100, 1400),
-    sell("AAPL", "2026-06-10", 5, 120, 1450),
-  ]);
+  const { holdings, sales } = replay(
+    [
+      buy("AAPL", "2026-01-10", 10, 100, 1300),
+      buy("AAPL", "2026-03-10", 10, 100, 1400),
+      sell("AAPL", "2026-06-10", 5, 120, 1450),
+    ],
+    COST_METHOD.AVERAGE
+  );
 
   assert.equal(sales[0].proceedsKrw, 870_000);
   assert.equal(sales[0].costKrw, 675_000);
@@ -454,7 +458,7 @@ test("환율 가정은 매수 시점 환율을 바꾸지 않는다", () => {
     transactions,
     [sell("AAPL", "2026-12-01", 5, 100, 0, 0, "sim-1")],
     2026,
-    { from: 1350, to: 1350, step: 50 }
+    { from: 1350, to: 1350, step: 50, method: COST_METHOD.AVERAGE }
   );
 
   // 취득가액은 매수일 환율로 굳어 있으므로 평균단가 135,000원 그대로다.
@@ -470,12 +474,12 @@ test("과거 거래의 적용환율을 고치면 이후 계산이 전부 다시 
     sell("AAPL", "2026-06-10", 5, 120, 1450, 0, "tx-3"),
   ];
 
-  const beforeFix = annualSummary(transactions, 2026);
+  const beforeFix = annualSummary(transactions, 2026, COST_METHOD.AVERAGE);
   assert.equal(beforeFix.holdings.get("AAPL").avgCostKrw, 135_000);
   assert.equal(beforeFix.tax.totalGainKrw, 195_000);
 
   const corrected = transactions.map((tx) => (tx.id === "tx-1" ? { ...tx, fx_rate: 1200 } : tx));
-  const afterFix = annualSummary(corrected, 2026);
+  const afterFix = annualSummary(corrected, 2026, COST_METHOD.AVERAGE);
 
   assert.equal(afterFix.holdings.get("AAPL").avgCostKrw, 130_000);
   assert.equal(afterFix.yearSales[0].costKrw, 650_000);

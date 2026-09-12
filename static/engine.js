@@ -16,17 +16,42 @@ const QTY_EPSILON = 1e-9;
 
 export class EngineError extends Error {}
 
+export const COST_METHOD = { FIFO: "fifo", AVERAGE: "average" };
+
 export class Holding {
   constructor(ticker) {
     this.ticker = ticker;
     this.quantity = 0;
     this.totalCostKrw = 0;
+    /** 선입선출법에서만 쓰는 매수 로트 대기열. 먼저 취득한 것이 앞에 온다. */
+    this.lots = [];
   }
 
   get avgCostKrw() {
     if (this.quantity <= QTY_EPSILON) return 0;
     return this.totalCostKrw / this.quantity;
   }
+}
+
+/** 먼저 취득한 로트부터 소진하며 대응 취득가액을 계산한다. */
+function consumeFifo(holding, quantity) {
+  let remaining = quantity;
+  let cost = 0;
+
+  while (remaining > QTY_EPSILON && holding.lots.length) {
+    const lot = holding.lots[0];
+    const take = Math.min(lot.quantity, remaining);
+    const taken = lot.costKrw * (take / lot.quantity);
+
+    cost += taken;
+    lot.costKrw -= taken;
+    lot.quantity -= take;
+    remaining -= take;
+
+    if (lot.quantity <= QTY_EPSILON) holding.lots.shift();
+  }
+
+  return cost;
 }
 
 export class RealizedSale {
@@ -71,8 +96,14 @@ function sortedByDate(transactions) {
   });
 }
 
-/** 거래를 날짜순으로 처리해 현재 보유현황과 실현된 매도 목록을 반환한다. */
-export function replay(transactions) {
+/**
+ * 거래를 날짜순으로 처리해 현재 보유현황과 실현된 매도 목록을 반환한다.
+ *
+ * 취득가액 대응 방식은 method로 고른다. 선입선출법은 먼저 산 로트부터 소진하고,
+ * 이동평균법은 그 시점 평균단가를 쓴다. 어느 쪽을 적용할지는 투자자가 임의로
+ * 고르는 것이 아니라 증권회사가 계속 적용하는 방식에 달려 있다.
+ */
+export function replay(transactions, method = COST_METHOD.FIFO) {
   const holdings = new Map();
   const sales = [];
 
@@ -89,6 +120,7 @@ export function replay(transactions) {
         throw new EngineError(`${ticker} ${tx.date}: 분할비율은 0보다 커야 합니다.`);
       }
       holding.quantity *= ratio;
+      holding.lots.forEach((lot) => (lot.quantity *= ratio));
       continue;
     }
 
@@ -102,15 +134,20 @@ export function replay(transactions) {
     }
 
     if (tx.type === "buy") {
-      holding.totalCostKrw += (grossUsd + feeUsd) * fxRate;
+      const costKrw = (grossUsd + feeUsd) * fxRate;
+      holding.totalCostKrw += costKrw;
       holding.quantity += quantity;
+      holding.lots.push({ quantity, costKrw });
     } else if (tx.type === "sell") {
       if (quantity > holding.quantity + QTY_EPSILON) {
         throw new EngineError(
           `${ticker} ${tx.date}: 매도수량(${quantity})이 보유수량(${holding.quantity})을 초과합니다.`
         );
       }
-      const costKrw = holding.avgCostKrw * quantity;
+      const costKrw =
+        method === COST_METHOD.FIFO
+          ? consumeFifo(holding, quantity)
+          : holding.avgCostKrw * quantity;
       sales.push(
         new RealizedSale({
           txId: tx.id ?? "",
@@ -127,6 +164,7 @@ export function replay(transactions) {
       if (holding.quantity <= QTY_EPSILON) {
         holding.quantity = 0;
         holding.totalCostKrw = 0;
+        holding.lots = [];
       }
     } else {
       throw new EngineError(`알 수 없는 거래 구분: ${tx.type}`);
@@ -183,9 +221,9 @@ export function maxSellableQuantity(transactions, ticker, date) {
 }
 
 /** 거래를 추가해도 원장이 깨지지 않는지 미리 확인한다. 화면에서 입력을 막는 용도. */
-export function canAddTransaction(transactions, candidate) {
+export function canAddTransaction(transactions, candidate, method = COST_METHOD.FIFO) {
   try {
-    replay([...transactions, candidate]);
+    replay([...transactions, candidate], method);
     return { ok: true, error: null };
   } catch (err) {
     if (err instanceof EngineError) return { ok: false, error: err.message };
@@ -225,11 +263,33 @@ export function calculateTax(totalGainKrw) {
  * 기본공제는 매도 건마다 차감되는 게 아니라, 그 해 매도를 전부 합산한
  * 뒤(손익통산) 연 1회만 적용된다.
  */
-export function annualSummary(transactions, year) {
-  const { holdings, sales } = replay(transactions);
+export function annualSummary(transactions, year, method = COST_METHOD.FIFO) {
+  const { holdings, sales } = replay(transactions, method);
   const yearSales = sales.filter((s) => s.date.slice(0, 4) === String(year));
   const totalGain = yearSales.reduce((sum, s) => sum + s.gainKrw, 0);
   return { holdings, yearSales, tax: calculateTax(totalGain) };
+}
+
+/**
+ * 같은 거래 기록을 선입선출법과 이동평균법으로 각각 계산해 나란히 돌려준다.
+ *
+ * 어느 쪽을 적용할지는 증권회사가 과세연도별로 계속 적용하는 방식에 달려 있어
+ * 투자자가 고를 수 있는 것이 아니다. 그래서 고르라고 묻는 대신 차이만 보여준다.
+ */
+export function compareMethods(transactions, year) {
+  const fifo = annualSummary(transactions, year, COST_METHOD.FIFO);
+  const average = annualSummary(transactions, year, COST_METHOD.AVERAGE);
+  const differenceKrw = fifo.tax.totalTaxKrw - average.tax.totalTaxKrw;
+
+  return {
+    fifo: fifo.tax,
+    average: average.tax,
+    fifoSales: fifo.yearSales,
+    averageSales: average.yearSales,
+    differenceKrw,
+    lowerMethod:
+      differenceKrw === 0 ? null : differenceKrw < 0 ? COST_METHOD.FIFO : COST_METHOD.AVERAGE,
+  };
 }
 
 export const TAX_FREE_HEADROOM_LABEL = "올해 세금 없이 추가로 실현 가능한 이익";
@@ -241,8 +301,8 @@ export const TAX_FREE_HEADROOM_LABEL = "올해 세금 없이 추가로 실현 �
  * 실현해 둔 해에는 그 손실만큼 이익을 더 얹어도 통산되어 세금이 없다.
  * 그래서 상한이 아니라 실제 여유분을 계산한다.
  */
-export function taxFreeHeadroomKrw(transactions, year) {
-  const { tax } = annualSummary(transactions, year);
+export function taxFreeHeadroomKrw(transactions, year, method = COST_METHOD.FIFO) {
+  const { tax } = annualSummary(transactions, year, method);
   return Math.max(0, BASIC_DEDUCTION_KRW - tax.totalGainKrw);
 }
 
@@ -259,7 +319,7 @@ export function taxFreeHeadroomKrw(transactions, year) {
  * 환율만 가정값으로 바꾼다. 환율이 오르면 원화 양도가액이 커져서 세금도
  * 함께 늘어난다.
  */
-export function fxSensitivity(transactions, virtualSales, year, { from, to, step } = {}) {
+export function fxSensitivity(transactions, virtualSales, year, { from, to, step, method } = {}) {
   const start = from ?? 1250;
   const end = to ?? 1500;
   const increment = step ?? 50;
@@ -273,7 +333,7 @@ export function fxSensitivity(transactions, virtualSales, year, { from, to, step
     // 누적 덧셈은 오차가 쌓이므로 매번 시작값에서 계산한다.
     const rate = start + i * increment;
     const atRate = virtualSales.map((sale) => ({ ...sale, fx_rate: rate }));
-    const result = simulate(transactions, atRate, year);
+    const result = simulate(transactions, atRate, year, method ?? COST_METHOD.FIFO);
     rows.push({
       fxRate: rate,
       simulatedGainKrw: result.simulatedGainKrw,
@@ -286,9 +346,9 @@ export function fxSensitivity(transactions, virtualSales, year, { from, to, step
   return rows;
 }
 
-export function simulate(transactions, virtualSales, year) {
-  const before = annualSummary(transactions, year).tax;
-  const withVirtual = annualSummary([...transactions, ...virtualSales], year);
+export function simulate(transactions, virtualSales, year, method = COST_METHOD.FIFO) {
+  const before = annualSummary(transactions, year, method).tax;
+  const withVirtual = annualSummary([...transactions, ...virtualSales], year, method);
   const after = withVirtual.tax;
 
   const virtualIds = new Set(virtualSales.map((v) => v.id));

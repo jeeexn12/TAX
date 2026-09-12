@@ -6,6 +6,7 @@ import {
   nextStartDate,
   scheduledDates,
 } from "./dca.js";
+import { renderCompare } from "./compare.js";
 import { initHoldings, refreshHoldings } from "./holdings.js";
 import { COST_METHODS, loadSettings, saveSettings, settlementDate } from "./settings.js";
 import {
@@ -86,7 +87,8 @@ function setupTabs() {
       document.querySelectorAll(".panel").forEach((p) => p.classList.remove("is-active"));
       tab.classList.add("is-active");
       document.querySelector(`[data-panel="${tab.dataset.tab}"]`).classList.add("is-active");
-      if (tab.dataset.tab === "holdings") refreshHoldings(transactions);
+      if (tab.dataset.tab === "holdings") refreshHoldings(transactions, settings.costMethod);
+      if (tab.dataset.tab === "compare") renderCompare(transactions, settings.costMethod);
     });
   });
 }
@@ -258,7 +260,7 @@ function findError() {
   if (!(Number(el.price.value) >= 0)) return "단가를 입력해주세요.";
   if (!(Number(el.fxRate.value) > 0)) return "적용환율을 확인해주세요.";
 
-  const check = canAddTransaction(transactions, buildTransaction());
+  const check = canAddTransaction(transactions, buildTransaction(), settings.costMethod);
   if (!check.ok) {
     // 매도 초과는 위 안내문이 사유까지 알려주므로 같은 말을 두 번 띄우지 않는다.
     return describeSellable() ? BLOCKED_SILENTLY : check.error;
@@ -414,7 +416,7 @@ function savePreview() {
   el.formError.hidden = false;
 
   renderTable();
-  refreshHoldings(transactions);
+  refreshHoldings(transactions, settings.costMethod);
 }
 
 function renderTable() {
@@ -507,7 +509,7 @@ function commitEdit(id) {
 
   const candidate = transactions.map((tx) => (tx.id === id ? { ...tx, ...fields } : tx));
   try {
-    replay(candidate);
+    replay(candidate, settings.costMethod);
   } catch (err) {
     if (err instanceof EngineError) {
       showRowError(`이렇게 고치면 이후 거래가 성립하지 않습니다. ${err.message}`);
@@ -521,7 +523,7 @@ function commitEdit(id) {
   editingId = null;
   el.formError.hidden = true;
   renderTable();
-  refreshHoldings(transactions);
+  refreshHoldings(transactions, settings.costMethod);
 }
 
 function showRowError(message) {
@@ -533,7 +535,7 @@ function showRowError(message) {
 function handleDelete(id) {
   const remaining = transactions.filter((tx) => tx.id !== id);
   try {
-    replay(remaining);
+    replay(remaining, settings.costMethod);
   } catch (err) {
     if (err instanceof EngineError) {
       showRowError(`이 거래를 지우면 이후 거래가 성립하지 않습니다. ${err.message}`);
@@ -546,7 +548,7 @@ function handleDelete(id) {
   transactions = loadTransactions();
   el.formError.hidden = true;
   renderTable();
-  refreshHoldings(transactions);
+  refreshHoldings(transactions, settings.costMethod);
   validate();
 }
 
@@ -573,7 +575,7 @@ function handleSubmit(event) {
   el.ratio.value = "";
 
   renderTable();
-  refreshHoldings(transactions);
+  refreshHoldings(transactions, settings.costMethod);
   validate();
 }
 
@@ -615,7 +617,8 @@ function setupSettings() {
       }
 
       renderTable();
-      refreshHoldings(transactions);
+      refreshHoldings(transactions, settings.costMethod);
+      renderCompare(transactions, settings.costMethod);
     })
   );
 

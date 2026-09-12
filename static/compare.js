@@ -1,0 +1,104 @@
+/**
+ * 선입선출법과 이동평균법을 나란히 보여주는 화면.
+ *
+ * 고르라고 묻지 않는다. 어느 쪽을 적용할지는 증권회사가 과세연도별로 계속
+ * 적용하는 방식에 달려 있어서, 여기서는 차이가 얼마인지만 드러낸다.
+ */
+
+import { COST_METHOD, compareMethods } from "./engine.js";
+import { COST_METHODS } from "./settings.js";
+
+/** 차액이 이 정도면 어느 쪽인지 확인할 실익이 크다고 보고 강조한다. */
+const MATERIAL_KRW = 500_000;
+
+const el = {
+  year: document.getElementById("compare-year"),
+  body: document.getElementById("compare-body"),
+};
+
+const won = (value) => `₩${Math.round(value).toLocaleString("ko-KR")}`;
+const signedWon = (value) =>
+  `${value >= 0 ? "+" : "−"}₩${Math.abs(Math.round(value)).toLocaleString("ko-KR")}`;
+
+function row(label, fifoValue, averageValue, className = "") {
+  return `
+    <tr class="${className}">
+      <th scope="row">${label}</th>
+      <td class="num">${fifoValue}</td>
+      <td class="num">${averageValue}</td>
+    </tr>`;
+}
+
+function verdict(result, currentMethod) {
+  const gap = Math.abs(result.differenceKrw);
+
+  if (gap === 0) {
+    return `<p class="compare-verdict is-same">두 방법의 세액이 같습니다. 종목마다 매수가 한 번뿐이거나,
+      차익이 모두 기본공제에 흡수되는 경우입니다.</p>`;
+  }
+
+  const cheaper = COST_METHODS[result.lowerMethod];
+  const applied = COST_METHODS[currentMethod];
+  const appliedIsCheaper = result.lowerMethod === currentMethod;
+  const level = gap >= MATERIAL_KRW ? "is-large" : "is-small";
+
+  return `
+    <p class="compare-verdict ${level}">
+      두 방법의 세액 차이는 <strong>${won(gap)}</strong>입니다.
+      ${cheaper}이 그만큼 적게 나옵니다.
+      ${
+        appliedIsCheaper
+          ? `지금 설정된 방법은 ${applied}입니다.`
+          : `지금 설정된 방법은 ${applied}이라 <strong>${won(gap)}만큼 더 내는 쪽</strong>으로 계산되고 있습니다.`
+      }
+      ${
+        gap >= MATERIAL_KRW
+          ? "금액이 작지 않으니 증권사에 어느 방식을 적용하는지 반드시 확인하세요."
+          : ""
+      }
+    </p>`;
+}
+
+export function renderCompare(transactions, currentMethod) {
+  const year = new Date().getFullYear();
+  el.year.textContent = `${year}년 귀속`;
+
+  const result = compareMethods(transactions, year);
+
+  if (!result.fifoSales.length && !result.averageSales.length) {
+    el.body.innerHTML = `<p class="empty">${year}년에 결제가 완료된 매도가 없습니다.
+      매도를 입력하면 두 방법의 차이를 계산합니다.</p>`;
+    return;
+  }
+
+  const fifoIsCurrent = currentMethod === COST_METHOD.FIFO;
+
+  el.body.innerHTML = `
+    ${verdict(result, currentMethod)}
+    <div class="table-scroll">
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th></th>
+            <th class="num ${fifoIsCurrent ? "is-current" : ""}">
+              선입선출법${fifoIsCurrent ? '<br /><small>현재 설정</small>' : ""}
+            </th>
+            <th class="num ${fifoIsCurrent ? "" : "is-current"}">
+              이동평균법${fifoIsCurrent ? "" : '<br /><small>현재 설정</small>'}
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          ${row("양도차익 합계", signedWon(result.fifo.totalGainKrw), signedWon(result.average.totalGainKrw))}
+          ${row("기본공제", `−${won(result.fifo.deductionKrw)}`, `−${won(result.average.deductionKrw)}`)}
+          ${row("과세표준", won(result.fifo.taxableBaseKrw), won(result.average.taxableBaseKrw))}
+          ${row("소득세 (20%)", won(result.fifo.incomeTaxKrw), won(result.average.incomeTaxKrw))}
+          ${row("지방소득세 (2%)", won(result.fifo.localTaxKrw), won(result.average.localTaxKrw))}
+          ${row("예상세액 합계", won(result.fifo.totalTaxKrw), won(result.average.totalTaxKrw), "is-total")}
+        </tbody>
+      </table>
+    </div>
+    <p class="hint">
+      매도 건별 취득가액이 달라져서 생기는 차이입니다. 양도가액은 두 방법이 같습니다.
+    </p>`;
+}

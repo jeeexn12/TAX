@@ -3,7 +3,7 @@
  * 확정 고시환율과 성격이 다르다. 화면에서도 "오늘 참고환율"로 구분해 부른다.
  */
 
-import { annualSummary, replay, sellableInfo, simulate, taxFreeHeadroomKrw } from "./engine.js";
+import { COST_METHOD, annualSummary, replay, sellableInfo, simulate, taxFreeHeadroomKrw } from "./engine.js";
 
 const FX_SLIDER = { min: 1250, max: 1500, step: 10 };
 const TYPE_LABELS = { buy: "매수", sell: "매도", split: "주식분할" };
@@ -34,10 +34,13 @@ const dateKr = (iso) => {
 };
 
 let transactions = [];
+let costMethod = COST_METHOD.FIFO;
 let todayFxRate = null;
 const prices = new Map();
 const sim = new Map();
 let expanded = null;
+
+const methodLabel = () => (costMethod === COST_METHOD.FIFO ? "선입선출법" : "이동평균법");
 
 function clampToSlider(rate) {
   const stepped = Math.round(rate / FX_SLIDER.step) * FX_SLIDER.step;
@@ -98,7 +101,7 @@ async function loadPrice(ticker) {
 }
 
 function activeHoldings() {
-  const { holdings } = replay(transactions);
+  const { holdings } = replay(transactions, costMethod);
   return [...holdings.values()]
     .filter((holding) => holding.quantity > 0)
     .sort((a, b) => (a.ticker < b.ticker ? -1 : 1));
@@ -106,14 +109,14 @@ function activeHoldings() {
 
 function renderSummary() {
   const year = new Date().getFullYear();
-  const { tax } = annualSummary(transactions, year);
+  const { tax } = annualSummary(transactions, year, costMethod);
 
   el.ytdGain.textContent = tax.totalGainKrw === 0 ? "—" : signedWon(tax.totalGainKrw);
   el.ytdTax.textContent =
     tax.totalTaxKrw > 0
       ? `확정 매도분 예상세액 ${won(tax.totalTaxKrw)}`
       : "확정 매도분에 대한 세금은 없습니다.";
-  el.headroom.textContent = won(taxFreeHeadroomKrw(transactions, year));
+  el.headroom.textContent = won(taxFreeHeadroomKrw(transactions, year, costMethod));
 }
 
 function limitReason(limitedBy) {
@@ -161,7 +164,8 @@ function simResultHtml(holding) {
         fx_rate: state.fxRate,
       },
     ],
-    year
+    year,
+    costMethod
   );
   const sale = outcome.simulatedSales[0];
 
@@ -174,7 +178,7 @@ function simResultHtml(holding) {
     ${yearNote}
     <dl class="sim-result">
       <div><dt>양도가액</dt><dd>${won(sale.proceedsKrw)}</dd></div>
-      <div><dt>취득가액 <em>이동평균단가 × ${shares(quantity)}주</em></dt><dd>${won(sale.costKrw)}</dd></div>
+      <div><dt>취득가액 <em>${methodLabel()} 기준 ${shares(quantity)}주 대응분</em></dt><dd>${won(sale.costKrw)}</dd></div>
       <div class="is-strong"><dt>양도차익</dt><dd>${signedWon(sale.gainKrw)}</dd></div>
       <div class="divider"></div>
       <div><dt>${year}년 실현손익 합계 <em>확정분 + 이 매도</em></dt><dd>${signedWon(outcome.after.totalGainKrw)}</dd></div>
@@ -235,6 +239,10 @@ function refreshSimResult() {
 function render() {
   const holdings = activeHoldings();
   renderSummary();
+
+  // 선입선출법에서는 잔여 로트의 가중평균이라 "이동평균단가"가 아니다.
+  document.getElementById("avg-cost-header").textContent =
+    costMethod === COST_METHOD.FIFO ? "주당 취득가액" : "이동평균단가";
 
   el.tableBody.innerHTML = "";
   for (const holding of holdings) {
@@ -334,8 +342,9 @@ function handleTableClick(event) {
   }
 }
 
-export function refreshHoldings(latestTransactions) {
+export function refreshHoldings(latestTransactions, method = COST_METHOD.FIFO) {
   transactions = latestTransactions;
+  costMethod = method;
   render();
 }
 

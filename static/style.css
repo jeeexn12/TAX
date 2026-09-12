@@ -366,6 +366,61 @@ tbody tr:last-child td {
   margin: 0;
 }
 
+.compare-verdict {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  line-height: 1.6;
+  background: var(--accent-soft);
+  color: #16307f;
+}
+
+.compare-verdict.is-large {
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 15px;
+  border: 1px solid currentColor;
+}
+
+.compare-verdict.is-same {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.compare-table {
+  min-width: 480px;
+}
+
+.compare-table th[scope="row"] {
+  color: var(--text);
+  font-weight: 500;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.compare-table thead th.is-current {
+  color: var(--accent);
+}
+
+.compare-table thead th small {
+  font-weight: 400;
+}
+
+.compare-table .is-total th,
+.compare-table .is-total td {
+  font-weight: 700;
+  font-size: 16px;
+  border-top: 2px solid var(--border);
+}
+
+@media (prefers-color-scheme: dark) {
+  .compare-verdict {
+    color: #cfdcff;
+  }
+}
+
 .settings {
   max-width: 1040px;
   margin: 16px auto 0;
