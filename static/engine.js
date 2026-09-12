@@ -62,6 +62,17 @@ export function replay(transactions) {
     if (!holdings.has(ticker)) holdings.set(ticker, new Holding(ticker));
     const holding = holdings.get(ticker);
 
+    // 주식분할은 양도가 아니므로 취득가액 총액은 그대로 두고 수량만 늘린다.
+    // 주당 취득단가는 avgCostKrw가 매번 나눠 계산하므로 자동으로 조정된다.
+    if (tx.type === "split") {
+      const ratio = Number(tx.ratio);
+      if (!(ratio > 0)) {
+        throw new EngineError(`${ticker} ${tx.date}: 분할비율은 0보다 커야 합니다.`);
+      }
+      holding.quantity *= ratio;
+      continue;
+    }
+
     const quantity = Number(tx.quantity);
     const fxRate = Number(tx.fx_rate);
     const grossUsd = Number(tx.price_usd) * quantity;

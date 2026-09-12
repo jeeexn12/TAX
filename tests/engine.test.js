@@ -26,6 +26,10 @@ function sell(ticker, date, quantity, priceUsd, fxRate, feeUsd = 0, id = "") {
   return { ...buy(ticker, date, quantity, priceUsd, fxRate, feeUsd, id), type: "sell" };
 }
 
+function split(ticker, date, ratio, id = "") {
+  return { id, type: "split", ticker, date, ratio };
+}
+
 test("이동평균 취득가액은 매수일별 환율로 환산해 누적된다", () => {
   const { holdings } = replay([
     buy("AAPL", "2026-01-10", 10, 100, 1300),
@@ -146,6 +150,72 @@ test("시뮬레이션은 확정 거래 대비 추가 세액을 보여준다", ()
   assert.equal(result.simulatedGainKrw, 5_800_000);
   assert.equal(result.after.totalGainKrw, 8_400_000);
   assert.equal(result.additionalTaxKrw, result.after.totalTaxKrw - result.before.totalTaxKrw);
+});
+
+test("주식분할은 취득가액 총액을 유지하고 주당 단가만 나눈다", () => {
+  const { holdings } = replay([
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    split("AAPL", "2026-05-20", 4),
+  ]);
+
+  assert.equal(holdings.get("AAPL").quantity, 40);
+  assert.equal(holdings.get("AAPL").totalCostKrw, 1_300_000);
+  assert.equal(holdings.get("AAPL").avgCostKrw, 32_500);
+});
+
+test("주식분할은 양도가 아니므로 과세대상 손익이 발생하지 않는다", () => {
+  const { yearSales, tax } = annualSummary(
+    [buy("AAPL", "2026-01-10", 10, 100, 1300), split("AAPL", "2026-05-20", 4)],
+    2026
+  );
+
+  assert.equal(yearSales.length, 0);
+  assert.equal(tax.totalGainKrw, 0);
+  assert.equal(tax.totalTaxKrw, 0);
+});
+
+test("분할 후 매도는 조정된 주당 취득단가로 계산된다", () => {
+  const { holdings, sales } = replay([
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    split("AAPL", "2026-05-20", 4),
+    sell("AAPL", "2026-06-10", 10, 30, 1400),
+  ]);
+
+  assert.equal(sales[0].proceedsKrw, 420_000);
+  assert.equal(sales[0].costKrw, 325_000);
+  assert.equal(sales[0].gainKrw, 95_000);
+  assert.equal(holdings.get("AAPL").quantity, 30);
+  assert.equal(holdings.get("AAPL").avgCostKrw, 32_500);
+});
+
+test("분할 후 추가 매수는 조정된 단가와 이동평균된다", () => {
+  const { holdings } = replay([
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    split("AAPL", "2026-05-20", 4),
+    buy("AAPL", "2026-07-10", 10, 40, 1400),
+  ]);
+
+  assert.equal(holdings.get("AAPL").quantity, 50);
+  assert.equal(holdings.get("AAPL").totalCostKrw, 1_860_000);
+  assert.equal(holdings.get("AAPL").avgCostKrw, 37_200);
+});
+
+test("역분할(주식병합)은 수량을 줄이고 주당 단가를 올린다", () => {
+  const { holdings } = replay([
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    split("AAPL", "2026-05-20", 0.5),
+  ]);
+
+  assert.equal(holdings.get("AAPL").quantity, 5);
+  assert.equal(holdings.get("AAPL").totalCostKrw, 1_300_000);
+  assert.equal(holdings.get("AAPL").avgCostKrw, 260_000);
+});
+
+test("분할비율이 0 이하면 오류", () => {
+  assert.throws(
+    () => replay([buy("AAPL", "2026-01-10", 10, 100, 1300), split("AAPL", "2026-05-20", 0)]),
+    EngineError
+  );
 });
 
 test("과거 거래의 적용환율을 고치면 이후 계산이 전부 다시 반영된다", () => {
