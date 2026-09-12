@@ -219,6 +219,40 @@ export function taxFreeHeadroomKrw(transactions, year) {
  * 확정 거래만으로 계산한 세액과, 가상 매도를 포함해 계산한 세액의 차액이
  * '지금 팔면 추가로 내야 하는 세금'이다.
  */
+/**
+ * 목표가 시뮬레이션에서 환율 가정을 바꿔가며 세액이 어떻게 달라지는지 계산한다.
+ *
+ * 매수 시점 환율은 이미 확정된 사실이므로 건드리지 않고, 앞으로 팔 시점의
+ * 환율만 가정값으로 바꾼다. 환율이 오르면 원화 양도가액이 커져서 세금도
+ * 함께 늘어난다.
+ */
+export function fxSensitivity(transactions, virtualSales, year, { from, to, step } = {}) {
+  const start = from ?? 1250;
+  const end = to ?? 1500;
+  const increment = step ?? 50;
+
+  if (!(increment > 0)) throw new EngineError("환율 간격은 0보다 커야 합니다.");
+  if (end < start) throw new EngineError("환율 상한이 하한보다 작습니다.");
+
+  const rows = [];
+  const stepCount = Math.floor((end - start) / increment + 1e-9);
+  for (let i = 0; i <= stepCount; i += 1) {
+    // 누적 덧셈은 오차가 쌓이므로 매번 시작값에서 계산한다.
+    const rate = start + i * increment;
+    const atRate = virtualSales.map((sale) => ({ ...sale, fx_rate: rate }));
+    const result = simulate(transactions, atRate, year);
+    rows.push({
+      fxRate: rate,
+      simulatedGainKrw: result.simulatedGainKrw,
+      totalGainKrw: result.after.totalGainKrw,
+      taxableBaseKrw: result.after.taxableBaseKrw,
+      totalTaxKrw: result.after.totalTaxKrw,
+      additionalTaxKrw: result.additionalTaxKrw,
+    });
+  }
+  return rows;
+}
+
 export function simulate(transactions, virtualSales, year) {
   const before = annualSummary(transactions, year).tax;
   const withVirtual = annualSummary([...transactions, ...virtualSales], year);

@@ -6,6 +6,7 @@ import {
   annualSummary,
   calculateTax,
   canAddTransaction,
+  fxSensitivity,
   maxSellableQuantity,
   replay,
   simulate,
@@ -341,6 +342,60 @@ test("분할비율이 0 이하면 오류", () => {
     () => replay([buy("AAPL", "2026-01-10", 10, 100, 1300), split("AAPL", "2026-05-20", 0)]),
     EngineError
   );
+});
+
+test("환율 가정을 1,250~1,500원으로 훑으면 구간별 세액이 나온다", () => {
+  const transactions = [buy("AAPL", "2026-01-10", 100, 100, 1300)];
+  const target = [sell("AAPL", "2026-12-01", 100, 150, 0, 0, "sim-1")];
+
+  const rows = fxSensitivity(transactions, target, 2026, { from: 1250, to: 1500, step: 50 });
+
+  assert.deepEqual(
+    rows.map((r) => r.fxRate),
+    [1250, 1300, 1350, 1400, 1450, 1500]
+  );
+
+  // 1,250원: 양도가액 100주 × $150 × 1250 = 18,750,000, 취득가액 13,000,000
+  assert.equal(rows[0].simulatedGainKrw, 5_750_000);
+  assert.equal(rows[0].taxableBaseKrw, 3_250_000);
+  assert.equal(rows[0].totalTaxKrw, 715_000);
+
+  // 1,500원: 양도가액 22,500,000
+  assert.equal(rows[5].simulatedGainKrw, 9_500_000);
+  assert.equal(rows[5].taxableBaseKrw, 7_000_000);
+  assert.equal(rows[5].totalTaxKrw, 1_540_000);
+});
+
+test("환율이 오르면 세액도 단조 증가한다", () => {
+  const rows = fxSensitivity(
+    [buy("AAPL", "2026-01-10", 100, 100, 1300)],
+    [sell("AAPL", "2026-12-01", 100, 150, 0, 0, "sim-1")],
+    2026,
+    { from: 1250, to: 1500, step: 25 }
+  );
+
+  assert.equal(rows.length, 11);
+  for (let i = 1; i < rows.length; i += 1) {
+    assert.ok(rows[i].totalTaxKrw >= rows[i - 1].totalTaxKrw);
+  }
+});
+
+test("환율 가정은 매수 시점 환율을 바꾸지 않는다", () => {
+  const transactions = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    buy("AAPL", "2026-03-10", 10, 100, 1400),
+  ];
+  const rows = fxSensitivity(
+    transactions,
+    [sell("AAPL", "2026-12-01", 5, 100, 0, 0, "sim-1")],
+    2026,
+    { from: 1350, to: 1350, step: 50 }
+  );
+
+  // 취득가액은 매수일 환율로 굳어 있으므로 평균단가 135,000원 그대로다.
+  // 양도가액 5주 × $100 × 1350 = 675,000, 취득가액 675,000 -> 차익 0
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].simulatedGainKrw, 0);
 });
 
 test("과거 거래의 적용환율을 고치면 이후 계산이 전부 다시 반영된다", () => {
