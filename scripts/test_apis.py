@@ -1,44 +1,38 @@
-import os
+"""외부 데이터 연동 수동 확인용 스크립트.
+
+    python scripts/test_apis.py
+"""
+
 import sys
-from datetime import date, timedelta
+import time
+from datetime import date
+from pathlib import Path
 
-import requests
-import yfinance as yf
-from dotenv import load_dotenv
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-load_dotenv()
+from services.fx import CACHE_FILE, get_usd_krw_rate
+from services.price import get_current_price_usd
 
-EXIM_API_KEY = os.getenv("EXIM_API_KEY")
-
-
-def test_exim(search_date: str) -> bool:
-    url = "https://www.koreaexim.go.kr/site/program/financial/exchangeJSON"
-    params = {"authkey": EXIM_API_KEY, "searchdate": search_date, "data": "AP01"}
-    resp = requests.get(url, params=params, timeout=10)
-    resp.raise_for_status()
-    rows = resp.json()
-    usd_rows = [r for r in rows if r.get("cur_unit") == "USD"]
-    if usd_rows:
-        print(f"[한국수출입은행] {search_date} USD 매매기준율(deal_bas_r): {usd_rows[0].get('deal_bas_r')}")
-        return True
-    print(f"[한국수출입은행] {search_date} 데이터 없음 (주말/공휴일로 추정), 이전 영업일 재시도")
-    return False
+WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"]
 
 
-def test_yfinance(ticker: str) -> None:
-    t = yf.Ticker(ticker)
-    price = t.fast_info.get("last_price") if hasattr(t, "fast_info") else None
-    if price is None:
-        hist = t.history(period="1d")
-        price = hist["Close"].iloc[-1] if not hist.empty else None
-    print(f"[yfinance] {ticker} 현재가: {price}")
+def show_rate(label: str, d: date) -> None:
+    started = time.perf_counter()
+    fx = get_usd_krw_rate(d)
+    elapsed = time.perf_counter() - started
+    note = f" -> {fx.applied_label}" if fx.is_fallback else ""
+    print(f"  {label} {d} ({WEEKDAYS[d.weekday()]}): {fx.rate:,.2f}원{note}  [{elapsed:.3f}초]")
 
 
 if __name__ == "__main__":
-    today = date.today()
-    for delta in range(7):
-        d = today - timedelta(days=delta)
-        if test_exim(d.strftime("%Y%m%d")):
-            break
+    print("[환율] 한국수출입은행 Open API")
+    show_rate("영업일 ", date(2026, 9, 11))
+    show_rate("일요일 ", date(2026, 9, 6))
+    show_rate("오늘   ", date.today())
+    print("  캐시 재조회(API 호출 없어야 함):")
+    show_rate("영업일 ", date(2026, 9, 11))
+    print(f"  캐시 파일: {CACHE_FILE}")
 
-    test_yfinance("AAPL")
+    print("\n[시세] yfinance")
+    for ticker in ("AAPL", "MSFT"):
+        print(f"  {ticker}: ${get_current_price_usd(ticker):,.2f}")
