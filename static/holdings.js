@@ -3,9 +3,10 @@
  * 확정 고시환율과 성격이 다르다. 화면에서도 "오늘 참고환율"로 구분해 부른다.
  */
 
-import { annualSummary, replay, simulate, taxFreeHeadroomKrw } from "./engine.js";
+import { annualSummary, replay, sellableInfo, simulate, taxFreeHeadroomKrw } from "./engine.js";
 
 const FX_SLIDER = { min: 1250, max: 1500, step: 10 };
+const TYPE_LABELS = { buy: "매수", sell: "매도", split: "주식분할" };
 
 const el = {
   todayFx: document.getElementById("today-fx"),
@@ -21,8 +22,10 @@ const el = {
 };
 
 const won = (value) => `₩${Math.round(value).toLocaleString("ko-KR")}`;
-const signedWon = (value) => `${value >= 0 ? "+" : "−"}₩${Math.abs(Math.round(value)).toLocaleString("ko-KR")}`;
-const usd = (value) => `$${Number(value).toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const signedWon = (value) =>
+  `${value >= 0 ? "+" : "−"}₩${Math.abs(Math.round(value)).toLocaleString("ko-KR")}`;
+const usd = (value) =>
+  `$${Number(value).toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const shares = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 8 });
 const today = () => new Date().toISOString().slice(0, 10);
 const dateKr = (iso) => {
@@ -36,20 +39,21 @@ const prices = new Map();
 const sim = new Map();
 let expanded = null;
 
+function clampToSlider(rate) {
+  const stepped = Math.round(rate / FX_SLIDER.step) * FX_SLIDER.step;
+  return Math.min(FX_SLIDER.max, Math.max(FX_SLIDER.min, stepped));
+}
+
 function simStateFor(ticker, holding) {
   if (!sim.has(ticker)) {
     sim.set(ticker, {
       quantity: holding.quantity,
       targetPrice: prices.get(ticker)?.value ?? null,
+      saleDate: today(),
       fxRate: clampToSlider(todayFxRate ?? 1350),
     });
   }
   return sim.get(ticker);
-}
-
-function clampToSlider(rate) {
-  const stepped = Math.round(rate / FX_SLIDER.step) * FX_SLIDER.step;
-  return Math.min(FX_SLIDER.max, Math.max(FX_SLIDER.min, stepped));
 }
 
 async function loadTodayFx() {
@@ -112,56 +116,87 @@ function renderSummary() {
   el.headroom.textContent = won(taxFreeHeadroomKrw(transactions, year));
 }
 
-function simulationHtml(holding) {
+function limitReason(limitedBy) {
+  if (!limitedBy) return "";
+  const amount =
+    limitedBy.type === "split"
+      ? `${shares(limitedBy.ratio)}배`
+      : `${shares(limitedBy.quantity)}주`;
+  return ` ${limitedBy.date} ${TYPE_LABELS[limitedBy.type]} ${amount} 때문에 제한됩니다.`;
+}
+
+function simResultHtml(holding) {
   const state = simStateFor(holding.ticker, holding);
   const price = prices.get(holding.ticker);
   const targetPrice = state.targetPrice ?? price?.value ?? 0;
   const quantity = state.quantity;
+  const saleDate = state.saleDate;
 
-  const valid = quantity > 0 && quantity <= holding.quantity && targetPrice >= 0;
-  const year = new Date().getFullYear();
+  if (!saleDate) return '<p class="empty">매도 가정일을 선택해주세요.</p>';
 
-  let result = "";
-  if (valid) {
-    const virtual = [
+  const info = sellableInfo(transactions, holding.ticker, saleDate);
+  if (!(quantity > 0) || !(targetPrice >= 0)) {
+    return `<p class="empty">매도수량과 목표가를 입력해주세요.</p>`;
+  }
+  if (quantity > info.max) {
+    const headline =
+      info.max === 0
+        ? `${saleDate} 기준으로는 매도할 수 있는 수량이 없습니다.`
+        : `${saleDate} 기준 최대 ${shares(info.max)}주까지 매도할 수 있습니다.`;
+    return `<p class="sim-warning">${headline}${limitReason(info.limitedBy)}</p>`;
+  }
+
+  const year = Number(saleDate.slice(0, 4));
+  const outcome = simulate(
+    transactions,
+    [
       {
         id: "__sim__",
         type: "sell",
         ticker: holding.ticker,
-        date: today(),
+        date: saleDate,
         quantity,
         price_usd: targetPrice,
         fee_usd: 0,
         fx_rate: state.fxRate,
       },
-    ];
-    const outcome = simulate(transactions, virtual, year);
-    const sale = outcome.simulatedSales[0];
+    ],
+    year
+  );
+  const sale = outcome.simulatedSales[0];
 
-    result = `
-      <dl class="sim-result">
-        <div><dt>양도가액</dt><dd>${won(sale.proceedsKrw)}</dd></div>
-        <div><dt>취득가액 <em>이동평균단가 × ${shares(quantity)}주</em></dt><dd>${won(sale.costKrw)}</dd></div>
-        <div class="is-strong"><dt>양도차익</dt><dd>${signedWon(sale.gainKrw)}</dd></div>
-        <div class="divider"></div>
-        <div><dt>올해 실현손익 합계 <em>확정분 + 이 매도</em></dt><dd>${signedWon(outcome.after.totalGainKrw)}</dd></div>
-        <div><dt>기본공제</dt><dd>−${won(outcome.after.deductionKrw)}</dd></div>
-        <div><dt>과세표준</dt><dd>${won(outcome.after.taxableBaseKrw)}</dd></div>
-        <div class="is-total"><dt>예상세액 <em>소득세 20% + 지방소득세 2%</em></dt><dd>${won(outcome.after.totalTaxKrw)}</dd></div>
-        <div class="is-highlight"><dt>이 매도로 늘어나는 세금</dt><dd>${won(outcome.additionalTaxKrw)}</dd></div>
-      </dl>`;
-  } else {
-    result = `<p class="empty">매도수량을 1주 이상 ${shares(holding.quantity)}주 이하로 입력해주세요.</p>`;
-  }
+  const yearNote =
+    year === new Date().getFullYear()
+      ? ""
+      : `<p class="sim-yearnote">${year}년 거래로 계산됩니다. 손익통산과 기본공제 250만원 모두 ${year}년 기준으로 따로 적용됩니다.</p>`;
+
+  return `
+    ${yearNote}
+    <dl class="sim-result">
+      <div><dt>양도가액</dt><dd>${won(sale.proceedsKrw)}</dd></div>
+      <div><dt>취득가액 <em>이동평균단가 × ${shares(quantity)}주</em></dt><dd>${won(sale.costKrw)}</dd></div>
+      <div class="is-strong"><dt>양도차익</dt><dd>${signedWon(sale.gainKrw)}</dd></div>
+      <div class="divider"></div>
+      <div><dt>${year}년 실현손익 합계 <em>확정분 + 이 매도</em></dt><dd>${signedWon(outcome.after.totalGainKrw)}</dd></div>
+      <div><dt>기본공제</dt><dd>−${won(outcome.after.deductionKrw)}</dd></div>
+      <div><dt>과세표준</dt><dd>${won(outcome.after.taxableBaseKrw)}</dd></div>
+      <div class="is-total"><dt>${year}년 예상세액 <em>소득세 20% + 지방소득세 2%</em></dt><dd>${won(outcome.after.totalTaxKrw)}</dd></div>
+      <div class="is-highlight"><dt>이 매도로 늘어나는 세금</dt><dd>${won(outcome.additionalTaxKrw)}</dd></div>
+    </dl>`;
+}
+
+function simulationHtml(holding) {
+  const state = simStateFor(holding.ticker, holding);
+  const price = prices.get(holding.ticker);
+  const targetPrice = state.targetPrice ?? price?.value ?? 0;
 
   return `
     <div class="sim" data-sim="${holding.ticker}">
-      <h3>매도 시뮬레이션</h3>
+      <h3>${holding.ticker} 매도 시뮬레이션</h3>
       <div class="sim-inputs">
         <label>
           <span class="label">매도수량 <em class="label-note">보유 ${shares(holding.quantity)}주</em></span>
-          <input type="number" step="any" min="0" max="${holding.quantity}"
-                 value="${quantity}" data-sim-field="quantity" />
+          <input type="number" step="any" min="0" value="${state.quantity}" data-sim-field="quantity" />
         </label>
         <label>
           <span class="label">목표가 (USD) <em class="label-note">${
@@ -169,18 +204,32 @@ function simulationHtml(holding) {
           }</em></span>
           <input type="number" step="any" min="0" value="${targetPrice}" data-sim-field="targetPrice" />
         </label>
+        <label>
+          <span class="label">매도 가정일 <em class="label-note">이 날짜가 속한 해로 계산됩니다</em></span>
+          <input type="date" value="${state.saleDate}" data-sim-field="saleDate" />
+        </label>
       </div>
       <div class="sim-fx">
         <div class="sim-fx-head">
           <span class="label">환율 가정 <em class="label-note">매도 시점 환율을 가정해봅니다</em></span>
-          <strong class="fx-value">${state.fxRate.toLocaleString("ko-KR")}원</strong>
+          <strong class="fx-value" id="sim-fx-value">${state.fxRate.toLocaleString("ko-KR")}원</strong>
         </div>
         <input type="range" min="${FX_SLIDER.min}" max="${FX_SLIDER.max}" step="${FX_SLIDER.step}"
                value="${state.fxRate}" data-sim-field="fxRate" />
-        <div class="sim-fx-scale"><span>${FX_SLIDER.min.toLocaleString("ko-KR")}원</span><span>${FX_SLIDER.max.toLocaleString("ko-KR")}원</span></div>
+        <div class="sim-fx-scale">
+          <span>${FX_SLIDER.min.toLocaleString("ko-KR")}원</span>
+          <span>${FX_SLIDER.max.toLocaleString("ko-KR")}원</span>
+        </div>
       </div>
-      ${result}
+      <div id="sim-result">${simResultHtml(holding)}</div>
     </div>`;
+}
+
+function refreshSimResult() {
+  const holding = activeHoldings().find((h) => h.ticker === expanded);
+  const slot = document.getElementById("sim-result");
+  if (!holding || !slot) return;
+  slot.innerHTML = simResultHtml(holding);
 }
 
 function render() {
@@ -198,7 +247,7 @@ function render() {
     const priceCell = price?.loading
       ? '<span class="muted">조회 중…</span>'
       : price?.error
-        ? `<span class="muted">시세 없음</span>`
+        ? '<span class="muted">시세 없음</span>'
         : `<input class="price-input" type="number" step="any" min="0" value="${price?.value ?? ""}"
              data-price="${holding.ticker}" ${price?.manual ? "" : "disabled"} />
            <label class="checkbox inline"><input type="checkbox" data-price-manual="${holding.ticker}"
@@ -214,7 +263,11 @@ function render() {
       <td class="num price-cell">${priceCell}</td>
       <td class="num">${marketKrw === null ? "—" : won(marketKrw)}</td>
       <td class="num ${gain === null ? "" : gain >= 0 ? "gain-up" : "gain-down"}">
-        ${gain === null ? "—" : `${signedWon(gain)}<br /><small>${((gain / holding.totalCostKrw) * 100).toFixed(1)}%</small>`}
+        ${
+          gain === null
+            ? "—"
+            : `${signedWon(gain)}<br /><small>${((gain / holding.totalCostKrw) * 100).toFixed(1)}%</small>`
+        }
       </td>
       <td class="num">
         <button type="button" class="link" data-toggle="${holding.ticker}">
@@ -235,29 +288,29 @@ function render() {
   }
 }
 
-function handleTableInput(event) {
-  const target = event.target;
+function handlePriceInput(event) {
+  const ticker = event.target.dataset.price;
+  if (!ticker) return;
+  const existing = prices.get(ticker) ?? {};
+  prices.set(ticker, { ...existing, value: Number(event.target.value) || null });
+  render();
+}
 
-  const priceTicker = target.dataset.price;
-  if (priceTicker) {
-    const existing = prices.get(priceTicker) ?? {};
-    prices.set(priceTicker, { ...existing, value: Number(target.value) || null });
-    render();
-    return;
-  }
+/** 입력 중에는 결과만 갈아끼운다. 패널 전체를 다시 그리면 커서가 튄다. */
+function handleSimInput(event) {
+  const field = event.target.dataset.simField;
+  if (!field) return;
 
-  const simTicker = target.closest("[data-sim]")?.dataset.sim;
-  const field = target.dataset.simField;
-  if (simTicker && field) {
-    const state = sim.get(simTicker);
-    state[field] = Number(target.value);
-    render();
-    const refocus = document.querySelector(`[data-sim="${simTicker}"] [data-sim-field="${field}"]`);
-    if (refocus) {
-      refocus.focus();
-      if (refocus.type !== "range") refocus.setSelectionRange?.(refocus.value.length, refocus.value.length);
-    }
+  const ticker = event.target.closest("[data-sim]")?.dataset.sim;
+  const state = sim.get(ticker);
+  if (!state) return;
+
+  state[field] = field === "saleDate" ? event.target.value : Number(event.target.value);
+
+  if (field === "fxRate") {
+    document.getElementById("sim-fx-value").textContent = `${state.fxRate.toLocaleString("ko-KR")}원`;
   }
+  refreshSimResult();
 }
 
 function handleTableClick(event) {
@@ -302,9 +355,9 @@ export function initHoldings() {
     render();
   });
 
-  el.tableBody.addEventListener("input", handleTableInput);
+  el.tableBody.addEventListener("input", handlePriceInput);
   el.tableBody.addEventListener("click", handleTableClick);
-  el.simPanel.addEventListener("input", handleTableInput);
+  el.simPanel.addEventListener("input", handleSimInput);
 
   loadTodayFx().then(render);
 }

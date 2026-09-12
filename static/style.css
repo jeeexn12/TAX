@@ -506,6 +506,28 @@ tr.is-open td {
   color: var(--muted);
 }
 
+.sim-warning {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--danger-soft);
+  color: var(--danger);
+  font-size: 13px;
+  font-weight: 600;
+  max-width: 520px;
+}
+
+.sim-yearnote {
+  margin: 0 0 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  border: 1px dashed var(--border);
+  color: var(--muted);
+  font-size: 12.5px;
+  max-width: 520px;
+}
+
 .sim-result {
   margin: 0;
   background: var(--surface);
