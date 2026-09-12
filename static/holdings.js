@@ -1,0 +1,310 @@
+/**
+ * 보유현황 화면. 평가와 시뮬레이션에만 쓰는 값이므로, 여기 환율은 거래입력의
+ * 확정 고시환율과 성격이 다르다. 화면에서도 "오늘 참고환율"로 구분해 부른다.
+ */
+
+import { annualSummary, replay, simulate, taxFreeHeadroomKrw } from "./engine.js";
+
+const FX_SLIDER = { min: 1250, max: 1500, step: 10 };
+
+const el = {
+  todayFx: document.getElementById("today-fx"),
+  todayFxManual: document.getElementById("today-fx-manual"),
+  todayFxNote: document.getElementById("today-fx-note"),
+  ytdGain: document.getElementById("ytd-gain"),
+  ytdTax: document.getElementById("ytd-tax"),
+  headroom: document.getElementById("headroom"),
+  tableBody: document.querySelector("#holdings-table tbody"),
+  empty: document.getElementById("holdings-empty"),
+  count: document.getElementById("holdings-count"),
+  simPanel: document.getElementById("sim-panel"),
+};
+
+const won = (value) => `₩${Math.round(value).toLocaleString("ko-KR")}`;
+const signedWon = (value) => `${value >= 0 ? "+" : "−"}₩${Math.abs(Math.round(value)).toLocaleString("ko-KR")}`;
+const usd = (value) => `$${Number(value).toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const shares = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 8 });
+const today = () => new Date().toISOString().slice(0, 10);
+const dateKr = (iso) => {
+  const [, m, d] = iso.split("-");
+  return `${Number(m)}월 ${Number(d)}일`;
+};
+
+let transactions = [];
+let todayFxRate = null;
+const prices = new Map();
+const sim = new Map();
+let expanded = null;
+
+function simStateFor(ticker, holding) {
+  if (!sim.has(ticker)) {
+    sim.set(ticker, {
+      quantity: holding.quantity,
+      targetPrice: prices.get(ticker)?.value ?? null,
+      fxRate: clampToSlider(todayFxRate ?? 1350),
+    });
+  }
+  return sim.get(ticker);
+}
+
+function clampToSlider(rate) {
+  const stepped = Math.round(rate / FX_SLIDER.step) * FX_SLIDER.step;
+  return Math.min(FX_SLIDER.max, Math.max(FX_SLIDER.min, stepped));
+}
+
+async function loadTodayFx() {
+  if (el.todayFxManual.checked) return;
+  el.todayFxNote.textContent = "조회 중…";
+  try {
+    const response = await fetch(`/api/fx?date=${today()}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    todayFxRate = data.rate;
+    el.todayFx.value = data.rate;
+    el.todayFxNote.textContent = `${dateKr(data.applied_date)} 고시환율 기준 (가장 최근 고시)`;
+    el.todayFxNote.className = "hint";
+  } catch (err) {
+    el.todayFxManual.checked = true;
+    el.todayFx.disabled = false;
+    el.todayFxNote.textContent = `${err.message} 환율을 직접 입력해주세요.`;
+    el.todayFxNote.className = "hint is-warning";
+  }
+}
+
+async function loadPrice(ticker) {
+  const existing = prices.get(ticker);
+  if (existing?.manual || existing?.loading) return;
+
+  prices.set(ticker, { ...existing, loading: true });
+  try {
+    const response = await fetch(`/api/price?ticker=${encodeURIComponent(ticker)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    // 미국 주식은 센트 단위로 호가되므로 소수점 이하 긴 꼬리는 표시상 잡음이다.
+    prices.set(ticker, {
+      value: Math.round(data.price_usd * 100) / 100,
+      manual: false,
+      loading: false,
+      error: null,
+    });
+  } catch (err) {
+    prices.set(ticker, { value: null, manual: false, loading: false, error: err.message });
+  }
+  render();
+}
+
+function activeHoldings() {
+  const { holdings } = replay(transactions);
+  return [...holdings.values()]
+    .filter((holding) => holding.quantity > 0)
+    .sort((a, b) => (a.ticker < b.ticker ? -1 : 1));
+}
+
+function renderSummary() {
+  const year = new Date().getFullYear();
+  const { tax } = annualSummary(transactions, year);
+
+  el.ytdGain.textContent = tax.totalGainKrw === 0 ? "—" : signedWon(tax.totalGainKrw);
+  el.ytdTax.textContent =
+    tax.totalTaxKrw > 0
+      ? `확정 매도분 예상세액 ${won(tax.totalTaxKrw)}`
+      : "확정 매도분에 대한 세금은 없습니다.";
+  el.headroom.textContent = won(taxFreeHeadroomKrw(transactions, year));
+}
+
+function simulationHtml(holding) {
+  const state = simStateFor(holding.ticker, holding);
+  const price = prices.get(holding.ticker);
+  const targetPrice = state.targetPrice ?? price?.value ?? 0;
+  const quantity = state.quantity;
+
+  const valid = quantity > 0 && quantity <= holding.quantity && targetPrice >= 0;
+  const year = new Date().getFullYear();
+
+  let result = "";
+  if (valid) {
+    const virtual = [
+      {
+        id: "__sim__",
+        type: "sell",
+        ticker: holding.ticker,
+        date: today(),
+        quantity,
+        price_usd: targetPrice,
+        fee_usd: 0,
+        fx_rate: state.fxRate,
+      },
+    ];
+    const outcome = simulate(transactions, virtual, year);
+    const sale = outcome.simulatedSales[0];
+
+    result = `
+      <dl class="sim-result">
+        <div><dt>양도가액</dt><dd>${won(sale.proceedsKrw)}</dd></div>
+        <div><dt>취득가액 <em>이동평균단가 × ${shares(quantity)}주</em></dt><dd>${won(sale.costKrw)}</dd></div>
+        <div class="is-strong"><dt>양도차익</dt><dd>${signedWon(sale.gainKrw)}</dd></div>
+        <div class="divider"></div>
+        <div><dt>올해 실현손익 합계 <em>확정분 + 이 매도</em></dt><dd>${signedWon(outcome.after.totalGainKrw)}</dd></div>
+        <div><dt>기본공제</dt><dd>−${won(outcome.after.deductionKrw)}</dd></div>
+        <div><dt>과세표준</dt><dd>${won(outcome.after.taxableBaseKrw)}</dd></div>
+        <div class="is-total"><dt>예상세액 <em>소득세 20% + 지방소득세 2%</em></dt><dd>${won(outcome.after.totalTaxKrw)}</dd></div>
+        <div class="is-highlight"><dt>이 매도로 늘어나는 세금</dt><dd>${won(outcome.additionalTaxKrw)}</dd></div>
+      </dl>`;
+  } else {
+    result = `<p class="empty">매도수량을 1주 이상 ${shares(holding.quantity)}주 이하로 입력해주세요.</p>`;
+  }
+
+  return `
+    <div class="sim" data-sim="${holding.ticker}">
+      <h3>매도 시뮬레이션</h3>
+      <div class="sim-inputs">
+        <label>
+          <span class="label">매도수량 <em class="label-note">보유 ${shares(holding.quantity)}주</em></span>
+          <input type="number" step="any" min="0" max="${holding.quantity}"
+                 value="${quantity}" data-sim-field="quantity" />
+        </label>
+        <label>
+          <span class="label">목표가 (USD) <em class="label-note">${
+            price?.value ? `현재 ${usd(price.value)}` : "시세 없음"
+          }</em></span>
+          <input type="number" step="any" min="0" value="${targetPrice}" data-sim-field="targetPrice" />
+        </label>
+      </div>
+      <div class="sim-fx">
+        <div class="sim-fx-head">
+          <span class="label">환율 가정 <em class="label-note">매도 시점 환율을 가정해봅니다</em></span>
+          <strong class="fx-value">${state.fxRate.toLocaleString("ko-KR")}원</strong>
+        </div>
+        <input type="range" min="${FX_SLIDER.min}" max="${FX_SLIDER.max}" step="${FX_SLIDER.step}"
+               value="${state.fxRate}" data-sim-field="fxRate" />
+        <div class="sim-fx-scale"><span>${FX_SLIDER.min.toLocaleString("ko-KR")}원</span><span>${FX_SLIDER.max.toLocaleString("ko-KR")}원</span></div>
+      </div>
+      ${result}
+    </div>`;
+}
+
+function render() {
+  const holdings = activeHoldings();
+  renderSummary();
+
+  el.tableBody.innerHTML = "";
+  for (const holding of holdings) {
+    const price = prices.get(holding.ticker);
+    const hasValue = Boolean(price?.value) && todayFxRate;
+    const marketKrw = hasValue ? price.value * holding.quantity * todayFxRate : null;
+    const gain = hasValue ? marketKrw - holding.totalCostKrw : null;
+    const isOpen = expanded === holding.ticker;
+
+    const priceCell = price?.loading
+      ? '<span class="muted">조회 중…</span>'
+      : price?.error
+        ? `<span class="muted">시세 없음</span>`
+        : `<input class="price-input" type="number" step="any" min="0" value="${price?.value ?? ""}"
+             data-price="${holding.ticker}" ${price?.manual ? "" : "disabled"} />
+           <label class="checkbox inline"><input type="checkbox" data-price-manual="${holding.ticker}"
+             ${price?.manual ? "checked" : ""} /><span>직접</span></label>`;
+
+    const row = document.createElement("tr");
+    row.className = isOpen ? "is-open" : "";
+    row.innerHTML = `
+      <td class="ticker">${holding.ticker}</td>
+      <td class="num">${shares(holding.quantity)}</td>
+      <td class="num">${won(holding.avgCostKrw)}</td>
+      <td class="num">${won(holding.totalCostKrw)}</td>
+      <td class="num price-cell">${priceCell}</td>
+      <td class="num">${marketKrw === null ? "—" : won(marketKrw)}</td>
+      <td class="num ${gain === null ? "" : gain >= 0 ? "gain-up" : "gain-down"}">
+        ${gain === null ? "—" : `${signedWon(gain)}<br /><small>${((gain / holding.totalCostKrw) * 100).toFixed(1)}%</small>`}
+      </td>
+      <td class="num">
+        <button type="button" class="link" data-toggle="${holding.ticker}">
+          ${isOpen ? "닫기" : "팔아보기"}
+        </button>
+      </td>`;
+    el.tableBody.appendChild(row);
+  }
+
+  const openHolding = holdings.find((holding) => holding.ticker === expanded);
+  el.simPanel.innerHTML = openHolding ? simulationHtml(openHolding) : "";
+
+  el.empty.hidden = holdings.length > 0;
+  el.count.textContent = holdings.length ? `${holdings.length}종목` : "";
+
+  for (const holding of holdings) {
+    if (!prices.has(holding.ticker)) loadPrice(holding.ticker);
+  }
+}
+
+function handleTableInput(event) {
+  const target = event.target;
+
+  const priceTicker = target.dataset.price;
+  if (priceTicker) {
+    const existing = prices.get(priceTicker) ?? {};
+    prices.set(priceTicker, { ...existing, value: Number(target.value) || null });
+    render();
+    return;
+  }
+
+  const simTicker = target.closest("[data-sim]")?.dataset.sim;
+  const field = target.dataset.simField;
+  if (simTicker && field) {
+    const state = sim.get(simTicker);
+    state[field] = Number(target.value);
+    render();
+    const refocus = document.querySelector(`[data-sim="${simTicker}"] [data-sim-field="${field}"]`);
+    if (refocus) {
+      refocus.focus();
+      if (refocus.type !== "range") refocus.setSelectionRange?.(refocus.value.length, refocus.value.length);
+    }
+  }
+}
+
+function handleTableClick(event) {
+  const toggle = event.target.dataset.toggle;
+  if (toggle) {
+    expanded = expanded === toggle ? null : toggle;
+    render();
+    return;
+  }
+
+  const manualTicker = event.target.dataset.priceManual;
+  if (manualTicker) {
+    const existing = prices.get(manualTicker) ?? {};
+    const manual = event.target.checked;
+    prices.set(manualTicker, { ...existing, manual });
+    if (!manual) {
+      prices.delete(manualTicker);
+      loadPrice(manualTicker);
+    }
+    render();
+  }
+}
+
+export function refreshHoldings(latestTransactions) {
+  transactions = latestTransactions;
+  render();
+}
+
+export function initHoldings() {
+  el.todayFxManual.addEventListener("change", () => {
+    el.todayFx.disabled = !el.todayFxManual.checked;
+    if (el.todayFxManual.checked) {
+      el.todayFxNote.textContent = "직접 입력한 환율로 평가합니다.";
+      el.todayFxNote.className = "hint";
+    } else {
+      loadTodayFx().then(render);
+    }
+  });
+
+  el.todayFx.addEventListener("input", () => {
+    todayFxRate = Number(el.todayFx.value) || null;
+    render();
+  });
+
+  el.tableBody.addEventListener("input", handleTableInput);
+  el.tableBody.addEventListener("click", handleTableClick);
+  el.simPanel.addEventListener("input", handleTableInput);
+
+  loadTodayFx().then(render);
+}

@@ -66,7 +66,10 @@
 
           <div class="field fx-field" data-only="trade">
             <div class="fx-head">
-              <span class="label">적용환율 (USD/KRW)</span>
+              <span class="label">
+                적용환율 (USD/KRW)
+                <em class="label-note">체결일 기준 매매기준율 · 실시간 시세 아님</em>
+              </span>
               <label class="checkbox">
                 <input type="checkbox" id="fx-manual" />
                 <span>직접 입력</span>
@@ -111,7 +114,58 @@
       </section>
 
       <section class="panel" data-panel="holdings">
-        <div class="card placeholder">보유현황 화면은 다음 단계에서 만듭니다.</div>
+        <div class="card summary">
+          <div class="summary-item">
+            <div class="summary-head">
+              <span class="label">
+                오늘 참고환율
+                <em class="label-note">평가·시뮬레이션용 · 확정 신고환율 아님</em>
+              </span>
+              <label class="checkbox">
+                <input type="checkbox" id="today-fx-manual" />
+                <span>직접 입력</span>
+              </label>
+            </div>
+            <input id="today-fx" type="number" step="any" min="0" disabled />
+            <p class="hint" id="today-fx-note">조회 중…</p>
+          </div>
+          <div class="summary-item">
+            <span class="label">올해 실현손익</span>
+            <output class="figure" id="ytd-gain">—</output>
+            <p class="hint" id="ytd-tax"></p>
+          </div>
+          <div class="summary-item">
+            <span class="label">올해 세금 없이 추가로 실현 가능한 이익</span>
+            <output class="figure" id="headroom">—</output>
+            <p class="hint">이 금액까지는 추가로 실현해도 세금이 없습니다.</p>
+          </div>
+        </div>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>보유 종목</h2>
+            <span class="count" id="holdings-count"></span>
+          </div>
+          <div class="table-scroll">
+            <table id="holdings-table">
+              <thead>
+                <tr>
+                  <th>티커</th>
+                  <th class="num">보유수량</th>
+                  <th class="num">이동평균단가</th>
+                  <th class="num">취득가액</th>
+                  <th class="num">적용 시세 (USD)</th>
+                  <th class="num">평가금액</th>
+                  <th class="num">평가손익</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="empty" id="holdings-empty">보유 중인 종목이 없습니다. 거래입력에서 매수를 먼저 넣어주세요.</p>
+          <div id="sim-panel"></div>
+        </section>
       </section>
 
       <section class="panel" data-panel="history">

@@ -1,4 +1,5 @@
 import { EngineError, canAddTransaction, replay, sellableInfo } from "./engine.js";
+import { initHoldings, refreshHoldings } from "./holdings.js";
 import { addTransaction, deleteTransaction, loadTransactions } from "./storage.js";
 
 const TYPE_LABELS = { buy: "매수", sell: "매도", split: "주식분할" };
@@ -41,6 +42,7 @@ function setupTabs() {
       document.querySelectorAll(".panel").forEach((p) => p.classList.remove("is-active"));
       tab.classList.add("is-active");
       document.querySelector(`[data-panel="${tab.dataset.tab}"]`).classList.add("is-active");
+      if (tab.dataset.tab === "holdings") refreshHoldings(transactions);
     });
   });
 }
@@ -232,6 +234,7 @@ function handleDelete(id) {
   transactions = loadTransactions();
   el.formError.hidden = true;
   renderTable();
+  refreshHoldings(transactions);
   validate();
 }
 
@@ -251,6 +254,7 @@ function handleSubmit(event) {
   el.ratio.value = "";
 
   renderTable();
+  refreshHoldings(transactions);
   validate();
 }
 
@@ -296,6 +300,7 @@ function init() {
   el.form.addEventListener("submit", handleSubmit);
 
   renderTable();
+  initHoldings();
   loadFxForDate();
   validate();
 }

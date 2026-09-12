@@ -366,6 +366,217 @@ tbody tr:last-child td {
   margin: 0;
 }
 
+.label-note {
+  display: block;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11.5px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+}
+
+.summary-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.summary-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.figure {
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.gain-up {
+  color: var(--buy);
+  font-weight: 600;
+}
+
+.gain-down {
+  color: var(--sell);
+  font-weight: 600;
+}
+
+.price-cell {
+  white-space: nowrap;
+}
+
+.price-input {
+  width: 92px;
+  padding: 5px 8px;
+  text-align: right;
+}
+
+.checkbox.inline {
+  margin-left: 6px;
+  font-size: 12px;
+}
+
+.link {
+  appearance: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--accent);
+  font: inherit;
+  font-weight: 600;
+  border-radius: 7px;
+  padding: 4px 12px;
+  cursor: pointer;
+}
+
+.link:hover {
+  background: var(--accent-soft);
+}
+
+tr.is-open td {
+  border-bottom: none;
+  background: var(--accent-soft);
+}
+
+#sim-panel:not(:empty) {
+  margin-top: 18px;
+  padding: 18px;
+  background: var(--accent-soft);
+  border-radius: var(--radius);
+}
+
+.sim h3 {
+  margin: 0 0 12px;
+  font-size: 14px;
+}
+
+.sim-inputs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.sim-inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sim-fx {
+  margin-bottom: 18px;
+  max-width: 520px;
+}
+
+.sim-fx-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.fx-value {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+
+.sim-fx input[type="range"] {
+  width: 100%;
+  margin: 6px 0 2px;
+  accent-color: var(--accent);
+}
+
+.sim-fx-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--muted);
+}
+
+.sim-result {
+  margin: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 16px;
+  max-width: 520px;
+}
+
+.sim-result > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 20px;
+  padding: 7px 0;
+}
+
+.sim-result dt {
+  color: var(--muted);
+}
+
+.sim-result dt em {
+  display: block;
+  font-style: normal;
+  font-size: 11.5px;
+  opacity: 0.85;
+}
+
+.sim-result dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.sim-result .divider {
+  border-top: 1px solid var(--border);
+  padding: 0;
+  margin: 4px 0;
+}
+
+.sim-result .is-strong dt,
+.sim-result .is-strong dd {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sim-result .is-total {
+  border-top: 1px solid var(--border);
+  margin-top: 4px;
+}
+
+.sim-result .is-total dt,
+.sim-result .is-total dd {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.sim-result .is-total dd {
+  font-size: 17px;
+}
+
+.sim-result .is-highlight {
+  border-top: 1px solid var(--border);
+}
+
+.sim-result .is-highlight dt,
+.sim-result .is-highlight dd {
+  color: var(--accent);
+  font-weight: 700;
+}
+
 .site-footer {
   max-width: 1040px;
   margin: 32px auto 0;
