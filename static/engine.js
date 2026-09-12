@@ -117,6 +117,53 @@ export function replay(transactions) {
 }
 
 /**
+ * 해당 날짜에 최대 몇 주까지 매도할 수 있는지 계산한다.
+ *
+ * 그 시점의 보유수량만 보면 부족하다. 과거 날짜로 매도를 끼워 넣으면 이미
+ * 입력해둔 이후 매도가 수량 부족으로 깨질 수 있기 때문에, 기준일 이후 모든
+ * 시점의 잔량까지 확인해 가장 빡빡한 값을 돌려준다. 중간에 분할이 있으면
+ * 팔린 주식도 같은 비율로 불어나므로 그만큼 나눠서 환산한다.
+ */
+export function maxSellableQuantity(transactions, ticker, date) {
+  const sorted = sortedByDate(transactions.filter((tx) => tx.ticker === ticker));
+
+  let quantity = 0;
+  for (const tx of sorted.filter((tx) => tx.date <= date)) {
+    if (tx.type === "split") quantity *= Number(tx.ratio);
+    else if (tx.type === "buy") quantity += Number(tx.quantity);
+    else if (tx.type === "sell") quantity -= Number(tx.quantity);
+  }
+
+  let limit = quantity;
+  let splitFactor = 1;
+  for (const tx of sorted.filter((tx) => tx.date > date)) {
+    if (tx.type === "split") {
+      const ratio = Number(tx.ratio);
+      quantity *= ratio;
+      splitFactor *= ratio;
+    } else if (tx.type === "buy") {
+      quantity += Number(tx.quantity);
+    } else if (tx.type === "sell") {
+      quantity -= Number(tx.quantity);
+    }
+    limit = Math.min(limit, quantity / splitFactor);
+  }
+
+  return Math.max(0, limit);
+}
+
+/** 거래를 추가해도 원장이 깨지지 않는지 미리 확인한다. 화면에서 입력을 막는 용도. */
+export function canAddTransaction(transactions, candidate) {
+  try {
+    replay([...transactions, candidate]);
+    return { ok: true, error: null };
+  } catch (err) {
+    if (err instanceof EngineError) return { ok: false, error: err.message };
+    throw err;
+  }
+}
+
+/**
  * 연간 손익통산 결과에 기본공제와 세율을 적용한다.
  *
  * 손실은 당해연도 내 통산만 가능하고 이월되지 않으므로, 통산 결과가 음수면

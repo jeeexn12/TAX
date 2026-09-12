@@ -5,6 +5,8 @@ import {
   EngineError,
   annualSummary,
   calculateTax,
+  canAddTransaction,
+  maxSellableQuantity,
   replay,
   simulate,
 } from "../static/engine.js";
@@ -81,6 +83,75 @@ test("보유수량을 초과해 매도하면 오류", () => {
     () => replay([buy("AAPL", "2026-01-10", 5, 100, 1300), sell("AAPL", "2026-02-10", 6, 100, 1300)]),
     EngineError
   );
+});
+
+test("보유수량을 초과해 매도해도 취득가액이 음수가 되지 않는다", () => {
+  const overselling = [
+    buy("AAPL", "2026-01-10", 5, 100, 1300),
+    sell("AAPL", "2026-02-10", 6, 100, 1300),
+  ];
+
+  assert.throws(() => replay(overselling), EngineError);
+
+  const check = canAddTransaction(
+    [buy("AAPL", "2026-01-10", 5, 100, 1300)],
+    sell("AAPL", "2026-02-10", 6, 100, 1300)
+  );
+  assert.equal(check.ok, false);
+  assert.match(check.error, /보유수량/);
+});
+
+test("매수 이전 날짜로 매도하면 막힌다", () => {
+  const check = canAddTransaction(
+    [buy("AAPL", "2026-05-10", 10, 100, 1300)],
+    sell("AAPL", "2026-01-10", 1, 100, 1300)
+  );
+
+  assert.equal(check.ok, false);
+});
+
+test("최대 매도가능수량은 그 시점 보유수량이다", () => {
+  const transactions = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    buy("AAPL", "2026-03-10", 5, 100, 1400),
+  ];
+
+  assert.equal(maxSellableQuantity(transactions, "AAPL", "2026-02-01"), 10);
+  assert.equal(maxSellableQuantity(transactions, "AAPL", "2026-04-01"), 15);
+  assert.equal(maxSellableQuantity(transactions, "AAPL", "2025-12-31"), 0);
+});
+
+test("최대 매도가능수량은 이후에 입력해둔 매도까지 고려한다", () => {
+  const transactions = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    sell("AAPL", "2026-12-10", 10, 200, 1300),
+  ];
+
+  assert.equal(maxSellableQuantity(transactions, "AAPL", "2026-06-01"), 0);
+
+  const check = canAddTransaction(transactions, sell("AAPL", "2026-06-01", 1, 150, 1300));
+  assert.equal(check.ok, false);
+});
+
+test("최대 매도가능수량은 중간 분할을 환산해서 계산한다", () => {
+  const transactions = [
+    buy("AAPL", "2026-01-10", 10, 100, 1300),
+    split("AAPL", "2026-05-20", 4),
+    sell("AAPL", "2026-12-10", 20, 50, 1300),
+  ];
+
+  assert.equal(maxSellableQuantity(transactions, "AAPL", "2026-02-01"), 5);
+  assert.equal(maxSellableQuantity(transactions, "AAPL", "2026-06-01"), 20);
+});
+
+test("정상 범위의 매도는 통과한다", () => {
+  const check = canAddTransaction(
+    [buy("AAPL", "2026-01-10", 10, 100, 1300)],
+    sell("AAPL", "2026-02-10", 10, 120, 1300)
+  );
+
+  assert.equal(check.ok, true);
+  assert.equal(check.error, null);
 });
 
 test("기본공제 후 22% 세율이 적용된다", () => {
