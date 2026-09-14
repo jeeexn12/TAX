@@ -105,8 +105,7 @@ function sortedByDate(transactions) {
  * 거래를 날짜순으로 처리해 현재 보유현황과 실현된 매도 목록을 반환한다.
  *
  * 취득가액 대응 방식은 method로 고른다. 선입선출법은 먼저 산 로트부터 소진하고,
- * 이동평균법은 그 시점 평균단가를 쓴다. 어느 쪽을 적용할지는 투자자가 임의로
- * 고르는 것이 아니라 증권회사가 계속 적용하는 방식에 달려 있다.
+ * 이동평균법은 그 시점 평균단가를 쓴다.
  */
 export function replay(transactions, method = COST_METHOD.FIFO) {
   const holdings = new Map();
@@ -284,9 +283,6 @@ export function annualSummary(transactions, year, method = COST_METHOD.FIFO, dom
 
 /**
  * 같은 거래 기록을 선입선출법과 이동평균법으로 각각 계산해 나란히 돌려준다.
- *
- * 어느 쪽을 적용할지는 증권회사가 과세연도별로 계속 적용하는 방식에 달려 있어
- * 투자자가 고를 수 있는 것이 아니다. 그래서 고르라고 묻는 대신 차이만 보여준다.
  */
 export function compareMethods(transactions, year, domesticGainKrw = 0) {
   const fifo = annualSummary(transactions, year, COST_METHOD.FIFO, domesticGainKrw);

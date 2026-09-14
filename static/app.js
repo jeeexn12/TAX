@@ -610,7 +610,7 @@ function setupSettings() {
       if (years.length) {
         el.methodWarning.textContent = `이미 매도가 확정된 연도(${years.join(
           ", "
-        )})가 있습니다. 그 연도를 이미 신고하셨다면 방법을 바꾸면 실제 신고와 어긋날 수 있습니다. 과세연도별로 계속 적용해야 하는 요건도 확인하세요.`;
+        )})가 있습니다. 그 연도를 이미 신고하셨다면 방법을 바꾸면 실제 신고와 어긋날 수 있습니다.`;
         el.methodWarning.hidden = false;
       } else {
         el.methodWarning.hidden = true;
