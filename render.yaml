@@ -4,7 +4,7 @@
 # 값을 물어보고, 이용자가 Render 화면에서 직접 넣는다.
 services:
   - type: web
-    name: us-tax
+    name: tax-simulator
     runtime: python
     plan: free
     region: singapore
