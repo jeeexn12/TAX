@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import { buildExportPayload, normalizeSmeTickers, validateTransactions } from "../static/storage.js";
-import { isMixedRate, rateLabel } from "../static/taxview.js";
+import { domesticGain, isMixedRate, rateLabel } from "../static/taxview.js";
 
 test("중소기업 종목 목록은 대문자로 맞추고 중복과 빈 값을 뺀다", () => {
   assert.deepEqual(normalizeSmeTickers([" abc ", "ABC", "", "xyz", 3, null]), ["ABC", "XYZ"]);
@@ -53,4 +53,10 @@ test("거래 통화는 목록에 있는 것만 받고, 없거나 모르는 통�
   assert.equal(japan.ticker, "7203.T");
   assert.equal(legacy.currency, "USD");
   assert.equal(unknown.currency, "USD");
+});
+
+test("국내주식 양도차익은 양도가액에서 취득가액 등 필요경비를 뺀 금액이다", () => {
+  assert.equal(domesticGain({ proceeds: 12_000_000, cost: 9_500_000 }), 2_500_000);
+  assert.equal(domesticGain({ proceeds: 3_000_000, cost: 4_200_000.9 }), -1_200_000);
+  assert.equal(domesticGain({ proceeds: "", cost: undefined }), 0);
 });

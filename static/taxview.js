@@ -10,3 +10,8 @@ export function isMixedRate(tax) {
 export function rateLabel(percent) {
   return percent === 10 ? "10% 중소기업" : `${percent}%`;
 }
+
+/** 국내주식 양도차익. 양도가액에서 취득가액 등 필요경비를 뺀다(소득세법 제97조). 원 미만은 버린다. */
+export function domesticGain({ proceeds, cost }) {
+  return Math.trunc((Number(proceeds) || 0) - (Number(cost) || 0));
+}

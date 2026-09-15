@@ -1155,3 +1155,62 @@ td.center {
     font-size: 14px;
   }
 }
+
+/* 매도 계획 표: 입력칸 아래 작은 설명이 있는 칸과 없는 칸의 높이를 위쪽에 맞춘다 */
+#plan-table td {
+  vertical-align: top;
+}
+
+/* 국내주식 양도 */
+.domestic-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+
+.domestic-figure {
+  font-size: 1.25rem;
+}
+
+.law-quote {
+  padding-left: 10px;
+  border-left: 3px solid var(--border);
+}
+
+.law-details {
+  margin-top: 14px;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.law-details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+.law-details h3 {
+  margin: 18px 0 6px;
+  font-size: 0.95rem;
+}
+
+.law-details h3 small {
+  margin-left: 6px;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.law-table td {
+  white-space: normal;
+  vertical-align: top;
+}
+
+.law-notes {
+  margin: 8px 0 0;
+  padding-left: 1.2rem;
+  display: grid;
+  gap: 4px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}

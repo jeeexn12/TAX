@@ -119,7 +119,7 @@ async function fetchPrice(ticker) {
 
 function applyFormCurrency(code) {
   el.priceUnit.textContent = `(${code})`;
-  el.fxUnit.textContent = rateUnitLabel(code);
+  el.fxUnit.textContent = `(${rateUnitLabel(code)})`;
 }
 
 /** 종목을 고르면 보유수량·현재가·오늘 환율을 미리 채운다. 모두 고쳐 쓸 수 있다. */

@@ -1,5 +1,5 @@
 /**
- * 손익·세금 화면. 귀속 연도별로 확정된 매도의 손익과 예상세액, 신고 안내를 보여준다.
+ * 손익·세금 화면. 귀속 연도별로 확정된 매도의 양도소득금액과 예상세액, 신고 안내를 보여준다.
  *
  * 보유현황에 있던 올해 요약과 국내주식 입력을 옮겨왔다. "보유현황"이라는 이름 아래에
  * 이익과 세금이 나오면 무엇을 보는 화면인지 와닿지 않는다는 의견을 반영했다.
@@ -7,9 +7,12 @@
 
 import { COST_METHOD, TAX_FREE_HEADROOM_LABEL, annualSummary, replay, taxFreeHeadroomKrw } from "./engine.js";
 import { loadSmeTickers } from "./storage.js";
-import { isMixedRate, rateLabel } from "./taxview.js";
+import { domesticGain, isMixedRate, rateLabel } from "./taxview.js";
 
+/** 다른 화면(보유현황·매도 계획)이 읽는 올해 국내주식 양도차익. 아래 금액에서 계산해 넣는다. */
 const DOMESTIC_GAIN_KEY = "us-tax:domestic-gain";
+/** 올해 국내주식 양도가액과 취득가액 등 필요경비 합계. */
+const DOMESTIC_AMOUNTS_KEY = "us-tax:domestic-amounts";
 /** 소득세법 제112조: 납부할 세액이 이 금액을 넘으면 분할납부할 수 있다. */
 const INSTALLMENT_THRESHOLD_KRW = 10_000_000;
 
@@ -23,6 +26,8 @@ const el = {
   headroomLabel: document.getElementById("tax-headroom-label"),
   headroom: document.getElementById("tax-headroom"),
   breakdown: document.getElementById("tax-breakdown"),
+  domesticProceeds: document.getElementById("domestic-proceeds"),
+  domesticCost: document.getElementById("domestic-cost"),
   domesticGain: document.getElementById("domestic-gain"),
   domesticWarning: document.getElementById("domestic-warning"),
   domesticYearNote: document.getElementById("domestic-year-note"),
@@ -52,6 +57,30 @@ function domesticGainFor(year) {
   return year === currentYear() ? Number(localStorage.getItem(DOMESTIC_GAIN_KEY)) || 0 : 0;
 }
 
+function loadDomesticAmounts() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(DOMESTIC_AMOUNTS_KEY) ?? "null");
+    if (!raw || typeof raw !== "object") return null;
+    return { proceeds: Number(raw.proceeds) || 0, cost: Number(raw.cost) || 0 };
+  } catch {
+    return null;
+  }
+}
+
+function saveDomesticAmounts() {
+  if (!el.domesticProceeds.value && !el.domesticCost.value) {
+    localStorage.removeItem(DOMESTIC_AMOUNTS_KEY);
+    localStorage.setItem(DOMESTIC_GAIN_KEY, "0");
+    return;
+  }
+  const amounts = {
+    proceeds: Math.trunc(Number(el.domesticProceeds.value) || 0),
+    cost: Math.trunc(Number(el.domesticCost.value) || 0),
+  };
+  localStorage.setItem(DOMESTIC_AMOUNTS_KEY, JSON.stringify(amounts));
+  localStorage.setItem(DOMESTIC_GAIN_KEY, String(domesticGain(amounts)));
+}
+
 function availableYears() {
   const { sales } = replay(transactions, costMethod);
   const years = new Set([currentYear(), ...sales.map((sale) => Number(sale.date.slice(0, 4)))]);
@@ -79,7 +108,7 @@ function breakdownHtml(tax) {
     : `<div><dt>과세표준</dt><dd>${won(tax.taxableBaseKrw)}</dd></div>`;
 
   return `
-    <div><dt>실현손익 합계</dt><dd>${signedWon(tax.totalGainKrw)}</dd></div>
+    <div><dt>양도소득금액 <em>양도차익·차손 통산</em></dt><dd>${signedWon(tax.totalGainKrw)}</dd></div>
     <div><dt>기본공제 <em>연 250만원, 먼저 판 매도부터 차감</em></dt><dd>−${won(tax.deductionKrw)}</dd></div>
     ${baseRows}
     <div><dt>소득세 <em>${isMixedRate(tax) ? "세율별 합계" : "20%"}</em></dt><dd>${won(tax.incomeTaxKrw)}</dd></div>
@@ -124,6 +153,35 @@ function salesRowHtml(sale, smeTickers) {
     </tr>`;
 }
 
+function renderDomestic(year, isCurrent) {
+  const amounts = loadDomesticAmounts();
+  const gain = Number(localStorage.getItem(DOMESTIC_GAIN_KEY)) || 0;
+
+  el.domesticProceeds.disabled = !isCurrent;
+  el.domesticCost.disabled = !isCurrent;
+  el.domesticGain.textContent =
+    gain === 0 && !amounts ? "—" : `${signedWon(gain)}${gain < 0 ? " (양도차손)" : ""}`;
+
+  const notes = [];
+  if (!isCurrent) {
+    notes.push(`국내주식은 올해 금액만 입력받아 ${year}년 계산에는 넣지 않았습니다.`);
+  } else if (!amounts && gain !== 0) {
+    notes.push(
+      `예전에 양도차익 ${signedWon(gain)}을 직접 입력해 두었습니다. 양도가액과 취득가액을 넣으면 그 값으로 바뀝니다.`
+    );
+  }
+  el.domesticYearNote.hidden = notes.length === 0;
+  el.domesticYearNote.textContent = notes.join(" ");
+
+  // 국내주식은 대주주·보유기간·중소기업 여부에 따라 세율이 다르다. 20%가 아닌 물량이 섞이면
+  // 과세표준 x 22%로 떨어지지 않으므로 통산 효과만 믿고 세액을 그대로 쓰면 안 된다.
+  el.domesticWarning.hidden = !isCurrent || gain === 0;
+  el.domesticWarning.textContent =
+    "국내주식분 세율이 20%가 아니면(대주주 1년 미만 보유 30%, 대주주 과세표준 3억원 초과분 25%, " +
+    "소액주주의 중소기업 주식 10% 등) 합산 세액은 참고용입니다. 이 도구는 국내주식 양도차익을 " +
+    "20% 물량으로 보고 통산과 기본공제만 반영합니다.";
+}
+
 function render() {
   renderYearOptions();
   const year = selectedYear;
@@ -162,17 +220,7 @@ function render() {
 
   el.breakdown.innerHTML = breakdownHtml(tax);
   el.filing.innerHTML = filingHtml(year, tax);
-
-  el.domesticGain.disabled = !isCurrent;
-  el.domesticYearNote.hidden = isCurrent;
-  el.domesticYearNote.textContent = `국내주식 손익은 올해 금액만 입력받아 ${year}년 계산에는 넣지 않았습니다.`;
-
-  // 국내 대주주 30%, 비상장 중소기업 10% 등 20%가 아닌 물량이 섞이면
-  // 과세표준 x 22%로 떨어지지 않는다. 통산 효과만 믿고 세액을 그대로 쓰면 안 된다.
-  el.domesticWarning.hidden = domestic === 0;
-  el.domesticWarning.textContent =
-    "국내주식분의 세율이 20%가 아닌 경우(대주주 1년 미만 30%, 비상장 중소기업 10% 등) " +
-    "합산 세액은 참고용입니다. 통산과 기본공제 효과만 반영되며, 물량별로 나눠 계산해야 합니다.";
+  renderDomestic(year, isCurrent);
 
   el.salesTitle.textContent = `${year}년 확정 매도 내역`;
   el.salesCount.textContent = yearSales.length ? `${yearSales.length}건` : "";
@@ -191,14 +239,18 @@ export function initYearly(initialTransactions, method = COST_METHOD.FIFO) {
   transactions = initialTransactions;
   costMethod = method;
 
-  const stored = Number(localStorage.getItem(DOMESTIC_GAIN_KEY)) || 0;
-  if (stored) el.domesticGain.value = stored;
+  const amounts = loadDomesticAmounts();
+  if (amounts) {
+    el.domesticProceeds.value = amounts.proceeds || "";
+    el.domesticCost.value = amounts.cost || "";
+  }
 
-  el.domesticGain.addEventListener("input", () => {
-    const value = Math.trunc(Number(el.domesticGain.value) || 0);
-    localStorage.setItem(DOMESTIC_GAIN_KEY, String(value));
-    render();
-  });
+  [el.domesticProceeds, el.domesticCost].forEach((input) =>
+    input.addEventListener("input", () => {
+      saveDomesticAmounts();
+      render();
+    })
+  );
 
   el.year.addEventListener("change", () => {
     selectedYear = Number(el.year.value);

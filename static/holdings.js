@@ -156,7 +156,7 @@ function renderTodayFx(codes) {
       return `
         <div class="today-fx-row">
           <div class="summary-head">
-            <span class="label">${rateUnitLabel(code)} <em class="label-note">${currencyInfo(code).name}</em></span>
+            <span class="label">${rateUnitLabel(code)}</span>
             <label class="checkbox">
               <input type="checkbox" data-fx-manual="${code}" ${entry.manual ? "checked" : ""} />
               <span>직접 입력</span>
@@ -164,7 +164,7 @@ function renderTodayFx(codes) {
           </div>
           <input type="number" step="any" min="0" value="${value}" data-fx-input="${code}"
             aria-label="${code} 오늘 참고환율" ${entry.manual ? "" : "disabled"} />
-          <p class="hint ${entry.warning ? "is-warning" : ""}">${entry.note}</p>
+          <p class="hint ${entry.warning ? "is-warning" : ""}">${currencyInfo(code).name} · ${entry.note}</p>
         </div>`;
     })
     .join("");
@@ -283,7 +283,7 @@ function simResultHtml(holding) {
       <div><dt>취득가액 <em>${methodLabel()} 기준 ${shares(quantity)}주 대응분</em></dt><dd>${won(sale.costKrw)}</dd></div>
       <div class="is-strong"><dt>양도차익 <em>${isSme ? "중소기업 10% 세율" : "20% 세율"}</em></dt><dd>${signedWon(sale.gainKrw)}</dd></div>
       <div class="divider"></div>
-      <div><dt>${year}년 실현손익 합계 <em>확정분 + 이 매도</em></dt><dd>${signedWon(outcome.after.totalGainKrw)}</dd></div>
+      <div><dt>${year}년 양도소득금액 <em>확정분 + 이 매도, 차익·차손 통산</em></dt><dd>${signedWon(outcome.after.totalGainKrw)}</dd></div>
       <div><dt>기본공제 <em>먼저 판 매도부터 차감</em></dt><dd>−${won(outcome.after.deductionKrw)}</dd></div>
       ${taxBaseRowsHtml(outcome.after)}
       <div class="is-total"><dt>${year}년 예상세액 <em>${
@@ -320,7 +320,7 @@ function simulationHtml(holding) {
     ? `
       <div class="sim-fx">
         <div class="sim-fx-head">
-          <span class="label">환율 가정 <em class="label-note">매도 시점 환율을 가정해봅니다</em></span>
+          <span class="label">환율 가정</span>
           <strong class="fx-value" id="sim-fx-value">${fxText(state.fxRate, code)}</strong>
         </div>
         <input type="range" min="${range.min}" max="${range.max}" step="${range.step}"
@@ -329,6 +329,7 @@ function simulationHtml(holding) {
           <span>${range.min.toLocaleString("ko-KR")}원</span>
           <span>${range.max.toLocaleString("ko-KR")}원</span>
         </div>
+        <p class="hint">매도 시점 환율을 가정해봅니다.</p>
       </div>`
     : "";
 
@@ -337,20 +338,21 @@ function simulationHtml(holding) {
       <h3>${holding.ticker} 매도 시뮬레이션</h3>
       <div class="sim-inputs">
         <label>
-          <span class="label">매도수량 <em class="label-note">보유 ${shares(holding.quantity)}주</em></span>
+          <span class="label">매도수량</span>
           <input type="number" step="any" min="0" value="${state.quantity}" data-sim-field="quantity" />
         </label>
         <label>
-          <span class="label">목표가 (${code}) <em class="label-note">${
-            price?.value ? `현재 ${formatMoney(price.value, code)}` : "시세 없음"
-          }</em></span>
+          <span class="label">목표가 (${code})</span>
           <input type="number" step="any" min="0" value="${targetPrice}" data-sim-field="targetPrice" />
         </label>
         <label>
-          <span class="label">매도 가정일 <em class="label-note">결제일이 속한 해로 계산됩니다</em></span>
+          <span class="label">매도 가정일</span>
           <input type="date" value="${state.saleDate}" data-sim-field="saleDate" />
         </label>
       </div>
+      <p class="hint">보유 ${shares(holding.quantity)}주 · ${
+        price?.value ? `현재가 ${formatMoney(price.value, code)}` : "현재가 없음"
+      } · 매도 가정일은 결제일이 속한 해로 계산합니다.</p>
       ${fxBlock}
       <div id="sim-result">${simResultHtml(holding)}</div>
     </div>`;

@@ -47,12 +47,11 @@
               <input id="settlement-days" type="number" min="0" max="10" step="1" />
               <span>영업일</span>
             </div>
-            <p class="hint">
-              미국 현지 결제는 2024-05-28부터 T+1이고 국내 증권사가 고객계좌에 반영하기까지
-              통상 하루가 더 걸려 T+2를 기본값으로 둡니다. 그 이전 거래는 T+3인 경우가 많습니다.
-              주말만 제외하고 공휴일은 반영하지 않으니, 명세서의 입출금일과 다르면
-              거래별로 결제일을 고쳐주세요.
+            <p class="hint law-quote">
+              소득세법 시행령 제178조의5 제1항: “양도가액 및 필요경비를 수령하거나 지출한 날 현재
+              「외국환거래법」에 의한 기준환율 또는 재정환율에 의하여 계산한다.”
             </p>
+            <p class="hint">그래서 대금이 계좌에 입출금되는 결제일의 환율을 적용합니다.</p>
           </div>
         </div>
       </details>
@@ -71,7 +70,7 @@
 
           <div class="grid">
             <div class="field ticker-field">
-              <label class="label" for="ticker">종목 <em class="label-note">이름이나 티커로 검색</em></label>
+              <label class="label" for="ticker">종목</label>
               <input id="ticker" name="ticker" placeholder="종목 이름이나 티커 (예: 애플, AAPL)" required />
             </div>
 
@@ -87,11 +86,9 @@
             </div>
 
             <div class="field" data-only="trade">
-              <label class="label" for="settlement-date">
-                결제일
-                <em class="label-note">대금 입출금일 · 환율은 이 날짜 기준</em>
-              </label>
+              <label class="label" for="settlement-date">결제일</label>
               <input id="settlement-date" type="date" />
+              <p class="hint">대금 입출금일 · 환율은 이 날짜 기준</p>
               <p class="hint" id="settlement-note"></p>
             </div>
 
@@ -130,23 +127,18 @@
             </div>
 
             <div class="field" data-only="split" hidden>
-              <label class="label" for="quantity-after">
-                변동 후 보유수량
-                <em class="label-note">분할·병합·무상주 후 증권사 취득내역의 수량</em>
-              </label>
+              <label class="label" for="quantity-after">변동 후 보유수량</label>
               <input id="quantity-after" type="number" step="any" min="0" placeholder="400" />
+              <p class="hint">분할·병합·무상주 후 증권사 취득내역의 수량</p>
               <p class="hint" id="adjust-note">티커와 변동일을 넣으면 그날 기록상 보유수량을 보여줍니다.</p>
             </div>
 
             <div class="field" data-only="split" hidden>
-              <label class="label" for="adjust-amount">
-                금액 (원)
-                <em class="label-note">명세서에 금액이 있을 때만</em>
-              </label>
+              <label class="label" for="adjust-amount">금액 (원)</label>
               <input id="adjust-amount" type="number" step="any" min="0" placeholder="0" />
               <p class="hint">
-                분할·병합처럼 금액이 없으면 비워두세요. 금액이 있으면 늘어난 주식을 그 금액의
-                새 로트로 넣습니다.
+                명세서에 금액이 있을 때만 넣으세요. 분할·병합처럼 금액이 없으면 비워두고, 금액이 있으면
+                늘어난 주식을 그 금액의 새 로트로 넣습니다.
               </p>
             </div>
 
@@ -169,16 +161,14 @@
 
           <div class="field fx-field" data-only="trade">
             <div class="fx-head">
-              <span class="label">
-                적용환율 (<span id="fx-unit">USD/KRW</span>)
-                <em class="label-note">결제일의 고시환율 (실시간 시세 아님)</em>
-              </span>
+              <span class="label">적용환율 (<span id="fx-unit">USD/KRW</span>)</span>
               <label class="checkbox">
                 <input type="checkbox" id="fx-manual" />
                 <span>직접 입력</span>
               </label>
             </div>
             <input id="fx-rate" type="number" step="any" min="0" disabled placeholder="거래일을 입력하면 자동 조회" />
+            <p class="hint">결제일의 고시환율 (실시간 시세 아님)</p>
             <p class="hint" id="fx-note">거래일을 입력하면 그날 고시환율을 가져옵니다.</p>
           </div>
 
@@ -249,11 +239,9 @@
       <section class="panel" data-panel="holdings">
         <div class="card summary">
           <div class="summary-item">
-            <span class="label">
-              오늘 참고환율
-              <em class="label-note">평가·시뮬레이션용 · 확정 신고환율 아님</em>
-            </span>
+            <span class="label">오늘 참고환율</span>
             <div class="today-fx-list" id="today-fx-list"></div>
+            <p class="hint">평가·시뮬레이션용 · 확정 신고환율 아님</p>
           </div>
         </div>
 
@@ -319,7 +307,7 @@
               <select id="plan-select"></select>
             </label>
             <label class="field">
-              <span class="label">계획 이름 <em class="label-note">입력하면 바로 저장</em></span>
+              <span class="label">계획 이름</span>
               <input id="plan-name" maxlength="30" autocomplete="off" />
             </label>
             <div class="plan-book-actions">
@@ -330,7 +318,7 @@
           </div>
           <p class="hint">
             계획을 여러 개 만들어 비교해보세요. <b>복사</b>하면 지금 계획은 그대로 두고 복사본에서
-            조금씩 바꿔볼 수 있습니다.
+            조금씩 바꿔볼 수 있습니다. 이름은 입력하면 바로 저장됩니다.
           </p>
         </div>
 
@@ -356,14 +344,15 @@
               <input id="plan-price" type="number" step="any" min="0" />
             </label>
             <label class="field">
-              <span class="label">매도일 <em class="label-note">결제일이 속한 해의 세금</em></span>
+              <span class="label">매도일</span>
               <input id="plan-date" type="date" />
             </label>
             <label class="field">
-              <span class="label">환율 가정 <em class="label-note" id="plan-fx-unit">USD/KRW</em></span>
+              <span class="label">환율 가정 <span id="plan-fx-unit">(USD/KRW)</span></span>
               <input id="plan-fx" type="number" step="any" min="0" />
             </label>
           </div>
+          <p class="hint">매도일은 결제일(체결일 + N영업일)이 속한 해의 세금으로 계산합니다.</p>
           <p class="hint" id="plan-form-note"></p>
           <div class="actions">
             <button type="submit" id="plan-add">계획에 추가</button>
@@ -386,7 +375,7 @@
                   <th>매도일</th>
                   <th class="num">환율</th>
                   <th class="num">매도대금</th>
-                  <th class="num">이익</th>
+                  <th class="num">양도차익</th>
                   <th class="num">이 줄로 늘어나는 세금</th>
                   <th></th>
                 </tr>
@@ -415,8 +404,9 @@
               <output class="figure" id="plan-tax">—</output>
             </div>
             <div class="summary-item is-net">
-              <span class="label">손에 남는 돈 <em class="label-note">매도대금 − 세금</em></span>
+              <span class="label">손에 남는 돈</span>
               <output class="figure" id="plan-net">—</output>
+              <p class="hint">매도대금 − 세금</p>
             </div>
           </div>
           <div class="table-scroll">
@@ -425,7 +415,7 @@
                 <tr>
                   <th>귀속 연도</th>
                   <th class="num">계획 매도대금</th>
-                  <th class="num">실현손익 합계</th>
+                  <th class="num">양도소득금액</th>
                   <th class="num">예상세액 (계획 전 → 후)</th>
                   <th class="num">늘어나는 세금</th>
                   <th>납부 시기</th>
@@ -436,7 +426,7 @@
             </table>
           </div>
           <p class="hint">
-            실현손익과 예상세액은 이미 판 거래와 켠 계획을 합친 금액입니다. 수수료·제세금은
+            양도소득금액과 예상세액은 이미 판 거래와 켠 계획을 합친 금액입니다. 수수료·제세금은
             반영하지 않습니다. 손익·세금 탭에 입력한 국내주식 손익은 올해 세금에만 합산되고,
             중소기업 표시는 보유현황에서 한 것을 따릅니다.
           </p>
@@ -465,8 +455,9 @@
           </div>
           <div class="tax-summary">
             <div class="summary-item">
-              <span class="label">실현손익 <em class="label-note">결제일이 속한 해 기준</em></span>
+              <span class="label">양도소득금액</span>
               <output class="figure" id="tax-gain">—</output>
+              <p class="hint">결제일이 속한 해 기준 · 양도차익과 양도차손을 통산한 금액</p>
               <p class="hint" id="tax-gain-note"></p>
             </div>
             <div class="summary-item">
@@ -483,19 +474,96 @@
           <dl class="sim-result tax-breakdown" id="tax-breakdown"></dl>
         </div>
 
-        <div class="card">
-          <label class="label" for="domestic-gain">
-            올해 국내주식 양도손익
-            <em class="label-note">해당될 때만 입력 · 손실은 마이너스로</em>
-          </label>
-          <input id="domestic-gain" type="number" step="1" placeholder="0" />
+        <div class="card domestic-card">
+          <div class="card-head">
+            <h2>올해 국내주식 양도</h2>
+          </div>
+          <div class="domestic-grid">
+            <div class="field">
+              <label class="label" for="domestic-proceeds">양도가액 (원)</label>
+              <input id="domestic-proceeds" type="number" step="1" min="0" placeholder="0" />
+            </div>
+            <div class="field">
+              <label class="label" for="domestic-cost">취득가액 등 필요경비 (원)</label>
+              <input id="domestic-cost" type="number" step="1" min="0" placeholder="0" />
+            </div>
+            <div class="field">
+              <span class="label">양도차익</span>
+              <output class="figure domestic-figure" id="domestic-gain">—</output>
+            </div>
+          </div>
           <p class="hint">
-            국내주식과 해외주식은 소득세법 제94조제1항제3호로 함께 묶여 손익이 통산되고
-            기본공제 250만원도 나눠 씁니다. 다만 <b>대주주 요건 등에 해당하는 경우에만</b>
-            과세대상이니, 해당 여부를 먼저 확인하세요.
+            과세대상인 국내주식을 판 경우에만 올해 합계를 넣으세요. 양도차익은 양도가액에서 취득가액 등
+            필요경비를 뺀 금액이고(소득세법 제97조), 해외주식과 통산되어 기본공제 250만원을 함께 씁니다.
           </p>
           <p class="hint" id="domestic-year-note" hidden></p>
           <p class="hint is-warning" id="domestic-warning" hidden></p>
+
+          <details class="law-details">
+            <summary>국내주식 과세 대상 · 대주주 요건 · 세율 보기</summary>
+
+            <h3>과세 대상 <small>소득세법 제94조 제1항 제3호</small></h3>
+            <div class="table-scroll">
+              <table class="law-table">
+                <thead>
+                  <tr><th>구분</th><th>양도소득세</th><th>근거</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>상장주식을 대주주가 양도</td><td>과세</td><td>가목 1)</td></tr>
+                  <tr><td>상장주식을 대주주가 아닌 자가 증권시장에서 양도</td><td>과세 안 함</td><td>가목</td></tr>
+                  <tr><td>상장주식을 대주주가 아닌 자가 증권시장 밖에서 양도</td><td>과세</td><td>가목 2)</td></tr>
+                  <tr><td>비상장주식 양도</td><td>과세</td><td>나목</td></tr>
+                  <tr>
+                    <td>비상장 중소·중견기업 주식을 대주주가 아닌 자가 K-OTC(금융투자협회 장외매매거래)로 양도</td>
+                    <td>과세 안 함</td><td>나목 단서</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="hint">
+              장외 양도라도 상법상 주식의 포괄적 교환·이전에 대한 주식매수청구권 행사로 양도하는 경우는
+              제외됩니다(가목 2) 단서).
+            </p>
+
+            <h3>대주주 요건 <small>소득세법 시행령 제157조</small></h3>
+            <div class="table-scroll">
+              <table class="law-table">
+                <thead>
+                  <tr><th>구분</th><th>지분율</th><th>또는 시가총액</th><th>근거</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>코스피(유가증권시장) 상장법인</td><td>1% 이상</td><td>50억원 이상</td><td>제1항</td></tr>
+                  <tr><td>코스닥 상장법인</td><td>2% 이상</td><td>50억원 이상</td><td>제2항 제1호</td></tr>
+                  <tr><td>코넥스 상장법인</td><td>4% 이상</td><td>50억원 이상</td><td>제2항 제2호</td></tr>
+                  <tr><td>비상장법인</td><td>4% 이상</td><td>50억원 이상</td><td>제3항</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <ul class="law-notes">
+              <li>주식을 판 해의 <b>직전 사업연도 종료일</b> 현재 소유분으로 판정합니다(제1항). 시가총액의 시가는
+                상장주식이면 그날 최종시세가액입니다(제4항).</li>
+              <li>주주 1인과 특수관계인 지분 합계가 그 법인에서 최대인 경우 등에는 친족 등의 지분을 합산합니다(제1항 단서, 제3항).</li>
+              <li>기준일에 지분율 기준에 못 미쳤더라도 그 후 주식을 취득해 기준에 해당하면 그 취득일 이후 대주주로 봅니다(제9항).</li>
+            </ul>
+
+            <h3>세율 <small>소득세법 제104조 제1항 제11호 · 지방소득세 별도</small></h3>
+            <div class="table-scroll">
+              <table class="law-table">
+                <thead>
+                  <tr><th>양도하는 사람</th><th>주식</th><th>소득세율</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>대주주</td><td>1년 미만 보유, 중소기업 외 법인 주식</td><td>30%</td></tr>
+                  <tr><td>대주주</td><td>그 밖의 주식</td><td>과세표준 3억원 이하 20%<br />3억원 초과분 25%</td></tr>
+                  <tr><td>대주주가 아닌 자</td><td>중소기업 주식</td><td>10%</td></tr>
+                  <tr><td>대주주가 아닌 자</td><td>그 밖의 주식</td><td>20%</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="hint">
+              조문 원문과 개정 여부는 국가법령정보센터에서 확인하세요. 요건 해당 여부는 도구가 판단하지 않습니다.
+            </p>
+          </details>
         </div>
 
         <div class="card filing-note" id="tax-filing"></div>

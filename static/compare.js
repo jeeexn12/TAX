@@ -120,7 +120,7 @@ export function renderCompare(transactions, currentMethod) {
           </tr>
         </thead>
         <tbody>
-          ${row("양도차익 합계", signedWon(result.fifo.totalGainKrw), signedWon(result.average.totalGainKrw))}
+          ${row("양도소득금액", signedWon(result.fifo.totalGainKrw), signedWon(result.average.totalGainKrw))}
           ${row("기본공제", `−${won(result.fifo.deductionKrw)}`, `−${won(result.average.deductionKrw)}`)}
           ${taxRows(result)}
           ${row("예상세액 합계", won(result.fifo.totalTaxKrw), won(result.average.totalTaxKrw), "is-total")}
