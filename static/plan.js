@@ -187,6 +187,7 @@ export function evaluatePlan(transactions, plan, options = {}) {
   });
 
   const acceptedIds = new Set(accepted.map((sale) => sale.id));
+  const acceptedYears = new Set(accepted.map(yearOf));
   const perYear = years.map((year) => {
     const before = summaryFor(transactions, year).tax;
     const after = summaryFor(withAccepted, year).tax;
@@ -212,7 +213,9 @@ export function evaluatePlan(transactions, plan, options = {}) {
 
   return {
     items,
-    years: perYear,
+    // 끈 줄만 있는 해는 빈 줄로 보여줄 이유가 없다. 켠 계획이 없어도 먼저 판 주식 때문에
+    // 세금이 달라진 해는 남긴다.
+    years: perYear.filter((y) => acceptedYears.has(y.year) || y.additionalTaxKrw !== 0),
     totals: {
       proceedsKrw: proceeds,
       additionalTaxKrw: additionalTax,

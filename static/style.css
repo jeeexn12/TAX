@@ -872,3 +872,85 @@ td.center {
   height: 1rem;
   cursor: pointer;
 }
+
+/* 매도 계획 */
+.plan-intro {
+  margin-top: 0;
+}
+
+.plan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.plan-grid select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+#plan-table .cell-input {
+  width: 100%;
+  min-width: 90px;
+}
+
+#plan-table input[type="date"].cell-input {
+  min-width: 140px;
+}
+
+.plan-year {
+  display: block;
+  margin-top: 2px;
+}
+
+.plan-include {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+#plan-table tr.is-excluded td:not(:first-child) {
+  opacity: 0.55;
+}
+
+.plan-error-row td {
+  color: var(--danger);
+  background: var(--danger-soft);
+  font-size: 0.85rem;
+}
+
+.plan-totals {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.plan-totals .is-net .figure {
+  color: var(--accent);
+}
+
+#plan-years th[scope="row"] {
+  text-align: left;
+  font-weight: 600;
+}
+
+/* 탭이 늘어 좁은 화면에서 글자가 두 줄로 끊기지 않도록 가로로 넘긴다 */
+.tabs {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab {
+  white-space: nowrap;
+  flex: none;
+}
+
+.plan-intro {
+  margin-bottom: 14px;
+}

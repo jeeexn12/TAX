@@ -8,6 +8,7 @@ import {
 } from "./dca.js";
 import { renderCompare } from "./compare.js";
 import { initHoldings, refreshHoldings } from "./holdings.js";
+import { initPlan, refreshPlan } from "./planview.js";
 import { COST_METHODS, loadSettings, saveSettings, settlementDate } from "./settings.js";
 import {
   addTransaction,
@@ -89,6 +90,7 @@ function setupTabs() {
       document.querySelector(`[data-panel="${tab.dataset.tab}"]`).classList.add("is-active");
       if (tab.dataset.tab === "holdings") refreshHoldings(transactions, settings.costMethod);
       if (tab.dataset.tab === "compare") renderCompare(transactions, settings.costMethod);
+      if (tab.dataset.tab === "plan") refreshPlan(transactions, settings);
     });
   });
 }
@@ -619,6 +621,7 @@ function setupSettings() {
       renderTable();
       refreshHoldings(transactions, settings.costMethod);
       renderCompare(transactions, settings.costMethod);
+      refreshPlan(transactions, settings);
     })
   );
 
@@ -630,6 +633,7 @@ function setupSettings() {
     refreshSettlementDate({ force: true });
     loadFxForDate();
     hidePreview();
+    refreshPlan(transactions, settings);
   });
 }
 
@@ -715,6 +719,7 @@ function init() {
 
   renderTable();
   initHoldings();
+  initPlan(transactions, settings);
   loadFxForDate();
   validate();
 }

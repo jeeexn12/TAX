@@ -15,6 +15,7 @@
     <nav class="tabs" role="tablist">
       <button class="tab is-active" data-tab="input" role="tab">거래입력</button>
       <button class="tab" data-tab="holdings" role="tab">보유현황</button>
+      <button class="tab" data-tab="plan" role="tab">매도 계획</button>
       <button class="tab" data-tab="compare" role="tab">방법 비교</button>
       <button class="tab" data-tab="history" role="tab">내역</button>
     </nav>
@@ -296,6 +297,116 @@
             매도한 해의 직전 사업연도 말 기준으로 판정하므로 해가 바뀌면 다시 확인하세요.
           </p>
           <div id="sim-panel"></div>
+        </section>
+      </section>
+
+      <section class="panel" data-panel="plan">
+        <form id="plan-form" class="card" autocomplete="off">
+          <div class="card-head">
+            <h2>매도 계획 추가</h2>
+          </div>
+          <p class="hint plan-intro">
+            팔 계획을 여러 줄 적어두고, 줄마다 켜고 끄며 세금과 손에 남는 돈을 비교해보세요.
+            계획은 실제 거래 기록과 따로 이 브라우저에 저장됩니다.
+          </p>
+          <div class="plan-grid">
+            <label class="field">
+              <span class="label">종목</span>
+              <select id="plan-ticker"></select>
+            </label>
+            <label class="field">
+              <span class="label">수량</span>
+              <input id="plan-quantity" type="number" step="any" min="0" />
+            </label>
+            <label class="field">
+              <span class="label">목표가 (USD)</span>
+              <input id="plan-price" type="number" step="any" min="0" />
+            </label>
+            <label class="field">
+              <span class="label">매도일 <em class="label-note">결제일이 속한 해의 세금</em></span>
+              <input id="plan-date" type="date" />
+            </label>
+            <label class="field">
+              <span class="label">환율 가정 <em class="label-note">USD/KRW</em></span>
+              <input id="plan-fx" type="number" step="any" min="0" />
+            </label>
+          </div>
+          <p class="hint" id="plan-form-note"></p>
+          <div class="actions">
+            <button type="submit" id="plan-add">계획에 추가</button>
+          </div>
+        </form>
+
+        <section class="card">
+          <div class="card-head">
+            <h2>계획 목록</h2>
+            <span class="count" id="plan-count"></span>
+          </div>
+          <div class="table-scroll" id="plan-table-wrap" hidden>
+            <table id="plan-table">
+              <thead>
+                <tr>
+                  <th class="center">포함</th>
+                  <th>종목</th>
+                  <th class="num">수량</th>
+                  <th class="num">목표가 (USD)</th>
+                  <th>매도일</th>
+                  <th class="num">환율</th>
+                  <th class="num">매도대금</th>
+                  <th class="num">이익</th>
+                  <th class="num">이 줄로 늘어나는 세금</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="empty" id="plan-empty">아직 계획이 없습니다. 위에서 팔 계획을 추가해보세요.</p>
+          <p class="hint" id="plan-marginal-note" hidden>
+            줄마다 늘어나는 세금은 다른 켠 줄은 그대로 두고 이 줄만 넣고 뺐을 때의 차이입니다.
+            기본공제 250만원을 함께 쓰기 때문에 줄별 금액을 더해도 아래 합계와 같지 않습니다.
+          </p>
+        </section>
+
+        <section class="card" id="plan-result" hidden>
+          <div class="card-head">
+            <h2>켠 계획을 모두 실행하면</h2>
+          </div>
+          <div class="plan-totals">
+            <div class="summary-item">
+              <span class="label">매도대금 합계</span>
+              <output class="figure" id="plan-proceeds">—</output>
+            </div>
+            <div class="summary-item">
+              <span class="label">늘어나는 세금</span>
+              <output class="figure" id="plan-tax">—</output>
+            </div>
+            <div class="summary-item is-net">
+              <span class="label">손에 남는 돈 <em class="label-note">매도대금 − 세금</em></span>
+              <output class="figure" id="plan-net">—</output>
+            </div>
+          </div>
+          <div class="table-scroll">
+            <table id="plan-years">
+              <thead>
+                <tr>
+                  <th>귀속 연도</th>
+                  <th class="num">계획 매도대금</th>
+                  <th class="num">실현손익 합계</th>
+                  <th class="num">예상세액 (계획 전 → 후)</th>
+                  <th class="num">늘어나는 세금</th>
+                  <th>납부 시기</th>
+                  <th class="num">세금 없이 더 실현 가능</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="hint">
+            실현손익과 예상세액은 이미 판 거래와 켠 계획을 합친 금액입니다. 수수료·제세금은
+            반영하지 않습니다. 보유현황에 입력한 국내주식 손익은 올해 세금에만 합산되고,
+            중소기업 표시도 보유현황에서 한 것을 따릅니다.
+          </p>
         </section>
       </section>
 

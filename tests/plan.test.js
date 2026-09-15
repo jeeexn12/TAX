@@ -76,6 +76,15 @@ test("해를 나눠 팔면 해마다 기본공제를 따로 받는다", () => {
   );
 });
 
+test("끈 줄만 있는 해는 연도별 결과에 나오지 않는다", () => {
+  const nextYearB = { ...SELL_B, saleDate: "2027-01-15", included: false };
+  const result = evaluatePlan(HOLDINGS, [SELL_A, nextYearB], OPTIONS);
+
+  assert.deepEqual(result.years.map((y) => y.year), [2026]);
+  // 켰을 때 늘어날 세금은 여전히 계산한다
+  assert.equal(itemOf(result, "2").marginalTaxKrw, 110_000);
+});
+
 test("연말 매도는 결제일이 다음 해면 다음 해 세금으로 계산된다", () => {
   const december = { ...SELL_A, saleDate: "2026-12-30" };
   const result = evaluatePlan(HOLDINGS, [december], { currentYear: 2026, settlementDays: 2 });
