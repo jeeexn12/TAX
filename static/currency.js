@@ -20,7 +20,7 @@ export const CURRENCIES = {
 };
 
 /** 달러 환율 가정 슬라이더는 이용자가 정한 범위다. 다른 통화는 오늘 환율 기준으로 잡는다. */
-const USD_SLIDER = { min: 1250, max: 1500, step: 10 };
+const USD_SLIDER = { min: 1200, max: 1600, step: 5 };
 const SLIDER_SPREAD = 0.1;
 
 export function normalizeCurrency(code) {
@@ -72,7 +72,7 @@ export function sliderRange(code, todayDisplayRate) {
   if (normalizeCurrency(code) === "USD") return { ...USD_SLIDER };
   const center = Number(todayDisplayRate);
   if (!(center > 0)) return null;
-  const step = center >= 500 ? 10 : center >= 50 ? 1 : 0.1;
+  const step = center >= 500 ? 5 : center >= 50 ? 1 : 0.1;
   const round = (value) => Math.round(value / step) * step;
   return {
     min: Number(round(center * (1 - SLIDER_SPREAD)).toFixed(1)),

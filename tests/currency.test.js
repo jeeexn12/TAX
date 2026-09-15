@@ -76,8 +76,8 @@ test("종목의 통화는 이미 입력된 매수·매도에서 가져오고 주
 });
 
 test("달러 슬라이더는 정한 범위, 다른 통화는 오늘 환율 ±10%", () => {
-  assert.deepEqual(sliderRange("USD", 1345), { min: 1250, max: 1500, step: 10 });
-  assert.deepEqual(sliderRange("JPY", 866.49), { min: 780, max: 950, step: 10 });
+  assert.deepEqual(sliderRange("USD", 1345), { min: 1200, max: 1600, step: 5 });
+  assert.deepEqual(sliderRange("JPY", 866.49), { min: 780, max: 955, step: 5 });
   assert.deepEqual(sliderRange("HKD", 172.4), { min: 155, max: 190, step: 1 });
   assert.equal(sliderRange("EUR", null), null);
 });

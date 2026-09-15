@@ -549,8 +549,8 @@ export function fxSensitivity(
   year,
   { from, to, step, method, domesticGainKrw, smeTickers } = {}
 ) {
-  const start = from ?? 1250;
-  const end = to ?? 1500;
+  const start = from ?? 1200;
+  const end = to ?? 1600;
   const increment = step ?? 50;
 
   if (!(increment > 0)) throw new EngineError("환율 간격은 0보다 커야 합니다.");
