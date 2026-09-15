@@ -9,6 +9,7 @@ import {
 import { renderCompare } from "./compare.js";
 import { initHoldings, refreshHoldings } from "./holdings.js";
 import { initPlan, refreshPlan } from "./planview.js";
+import { initYearly, refreshYearly } from "./yearly.js";
 import { COST_METHODS, loadSettings, saveSettings, settlementDate } from "./settings.js";
 import {
   addTransaction,
@@ -91,6 +92,7 @@ function setupTabs() {
       if (tab.dataset.tab === "holdings") refreshHoldings(transactions, settings.costMethod);
       if (tab.dataset.tab === "compare") renderCompare(transactions, settings.costMethod);
       if (tab.dataset.tab === "plan") refreshPlan(transactions, settings);
+      if (tab.dataset.tab === "tax") refreshYearly(transactions, settings.costMethod);
     });
   });
 }
@@ -622,6 +624,7 @@ function setupSettings() {
       refreshHoldings(transactions, settings.costMethod);
       renderCompare(transactions, settings.costMethod);
       refreshPlan(transactions, settings);
+      refreshYearly(transactions, settings.costMethod);
     })
   );
 
@@ -719,6 +722,7 @@ function init() {
 
   renderTable();
   initHoldings();
+  initYearly(transactions, settings.costMethod);
   initPlan(transactions, settings);
   loadFxForDate();
   validate();

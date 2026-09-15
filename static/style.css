@@ -996,3 +996,40 @@ td.center {
   border-color: var(--accent);
   color: var(--accent);
 }
+
+/* 손익·세금 */
+.year-select {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.tax-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.tax-breakdown {
+  margin-top: 16px;
+}
+
+.filing-note {
+  background: var(--accent-soft);
+  border-color: transparent;
+}
+
+.filing-note h3 {
+  margin: 0 0 8px;
+  font-size: 1rem;
+}
+
+.filing-note ul {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding-left: 1.2rem;
+}

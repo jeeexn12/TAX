@@ -150,7 +150,8 @@ export function replay(transactions, method = COST_METHOD.FIFO) {
       const costKrw = (grossUsd + feeUsd) * fxRate;
       holding.totalCostKrw += costKrw;
       holding.quantity += quantity;
-      holding.lots.push({ quantity, costKrw });
+      // 취득일은 결제일이다. 화면의 남은 로트 목록에 쓴다.
+      holding.lots.push({ quantity, costKrw, date: effectiveDate(tx) });
     } else if (tx.type === "sell") {
       if (quantity > holding.quantity + QTY_EPSILON) {
         throw new EngineError(

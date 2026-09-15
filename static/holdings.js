@@ -3,7 +3,7 @@
  * 확정 고시환율과 성격이 다르다. 화면에서도 "오늘 참고환율"로 구분해 부른다.
  */
 
-import { COST_METHOD, annualSummary, replay, sellableInfo, simulate, taxFreeHeadroomKrw } from "./engine.js";
+import { COST_METHOD, replay, sellableInfo, simulate } from "./engine.js";
 import { loadSettings, settlementDate } from "./settings.js";
 import { loadSmeTickers, saveSmeTickers } from "./storage.js";
 import { isMixedRate, rateLabel } from "./taxview.js";
@@ -15,16 +15,15 @@ const el = {
   todayFx: document.getElementById("today-fx"),
   todayFxManual: document.getElementById("today-fx-manual"),
   todayFxNote: document.getElementById("today-fx-note"),
-  ytdGain: document.getElementById("ytd-gain"),
-  ytdTax: document.getElementById("ytd-tax"),
-  headroom: document.getElementById("headroom"),
   tableBody: document.querySelector("#holdings-table tbody"),
   empty: document.getElementById("holdings-empty"),
   count: document.getElementById("holdings-count"),
   simPanel: document.getElementById("sim-panel"),
-  domesticGain: document.getElementById("domestic-gain"),
-  domesticWarning: document.getElementById("domestic-warning"),
   smeHint: document.getElementById("sme-hint"),
+  lotsCard: document.getElementById("lots-card"),
+  lotsNote: document.getElementById("lots-note"),
+  lotsWrap: document.getElementById("lots-wrap"),
+  lotsBody: document.querySelector("#lots-table tbody"),
 };
 
 const DOMESTIC_GAIN_KEY = "us-tax:domestic-gain";
@@ -43,7 +42,6 @@ const dateKr = (iso) => {
 
 let transactions = [];
 let costMethod = COST_METHOD.FIFO;
-let domesticGainKrw = 0;
 let smeTickers = [];
 let todayFxRate = null;
 const prices = new Map();
@@ -117,34 +115,34 @@ function activeHoldings() {
     .sort((a, b) => (a.ticker < b.ticker ? -1 : 1));
 }
 
-function renderSummary() {
-  const year = new Date().getFullYear();
-  const { tax, overseasGainKrw } = annualSummary(
-    transactions,
-    year,
-    costMethod,
-    domesticGainKrw,
-    smeTickers
-  );
-
-  el.ytdGain.textContent = tax.totalGainKrw === 0 ? "—" : signedWon(tax.totalGainKrw);
-  el.ytdTax.textContent =
-    domesticGainKrw !== 0
-      ? `해외 ${signedWon(overseasGainKrw)} + 국내 ${signedWon(domesticGainKrw)} 통산` +
-        (tax.totalTaxKrw > 0 ? ` · 예상세액 ${won(tax.totalTaxKrw)}` : " · 세금 없음")
-      : tax.totalTaxKrw > 0
-        ? `확정 매도분 예상세액 ${won(tax.totalTaxKrw)}`
-        : "확정 매도분에 대한 세금은 없습니다.";
-  el.headroom.textContent = won(
-    taxFreeHeadroomKrw(transactions, year, costMethod, domesticGainKrw, smeTickers)
-  );
-
-  // 국내 대주주 30%, 비상장 중소기업 10% 등 20%가 아닌 물량이 섞이면
-  // 과세표준 x 22%로 떨어지지 않는다. 통산 효과만 믿고 세액을 그대로 쓰면 안 된다.
-  el.domesticWarning.hidden = domesticGainKrw === 0;
-  el.domesticWarning.textContent =
-    "국내주식분의 세율이 20%가 아닌 경우(대주주 1년 미만 30%, 비상장 중소기업 10% 등) " +
-    "합산 세액은 참고용입니다. 통산과 기본공제 효과만 반영되며, 물량별로 나눠 계산해야 합니다.";
+/** 선입선출법에서 아직 팔리지 않은 매수 로트. 위에서부터 먼저 팔린 것으로 계산한다. */
+function renderLots(holdings) {
+  const isFifo = costMethod === COST_METHOD.FIFO;
+  el.lotsCard.hidden = holdings.length === 0;
+  el.lotsWrap.hidden = !isFifo;
+  el.lotsNote.textContent = isFifo
+    ? "선입선출법이라 종목마다 위에 있는 로트부터 먼저 팔린 것으로 계산합니다."
+    : "이동평균법은 매수 로트를 나누지 않고 평균단가로 계산하므로 로트 목록을 보여주지 않습니다.";
+  if (!isFifo) {
+    el.lotsBody.innerHTML = "";
+    return;
+  }
+  el.lotsBody.innerHTML = holdings
+    .flatMap((holding) =>
+      holding.lots
+        .filter((lot) => lot.quantity > 1e-9)
+        .map(
+          (lot) => `
+          <tr>
+            <td class="ticker">${holding.ticker}</td>
+            <td>${lot.date ?? "—"}</td>
+            <td class="num">${shares(lot.quantity)}</td>
+            <td class="num">${won(lot.costKrw / lot.quantity)}</td>
+            <td class="num">${won(lot.costKrw)}</td>
+          </tr>`
+        )
+    )
+    .join("");
 }
 
 function limitReason(limitedBy) {
@@ -180,6 +178,9 @@ function simResultHtml(holding) {
   }
 
   const year = Number(settleDate.slice(0, 4));
+  // 국내주식 손익은 "올해" 금액 하나만 입력받으므로 올해로 계산될 때만 넣는다.
+  const domesticGainKrw =
+    year === new Date().getFullYear() ? Number(localStorage.getItem(DOMESTIC_GAIN_KEY)) || 0 : 0;
   const outcome = simulate(
     transactions,
     [
@@ -293,7 +294,7 @@ function refreshSimResult() {
 
 function render() {
   const holdings = activeHoldings();
-  renderSummary();
+  renderLots(holdings);
 
   // 선입선출법에서는 잔여 로트의 가중평균이라 "이동평균단가"가 아니다.
   document.getElementById("avg-cost-header").textContent =
@@ -421,14 +422,6 @@ export function refreshHoldings(latestTransactions, method = COST_METHOD.FIFO) {
 
 export function initHoldings() {
   smeTickers = loadSmeTickers();
-  domesticGainKrw = Number(localStorage.getItem(DOMESTIC_GAIN_KEY)) || 0;
-  if (domesticGainKrw) el.domesticGain.value = domesticGainKrw;
-
-  el.domesticGain.addEventListener("input", () => {
-    domesticGainKrw = Math.trunc(Number(el.domesticGain.value) || 0);
-    localStorage.setItem(DOMESTIC_GAIN_KEY, String(domesticGainKrw));
-    render();
-  });
 
   el.todayFxManual.addEventListener("change", () => {
     el.todayFx.disabled = !el.todayFxManual.checked;

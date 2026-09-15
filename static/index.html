@@ -15,9 +15,9 @@
     <nav class="tabs" role="tablist">
       <button class="tab is-active" data-tab="input" role="tab">거래입력</button>
       <button class="tab" data-tab="holdings" role="tab">보유현황</button>
+      <button class="tab" data-tab="tax" role="tab">손익·세금</button>
       <button class="tab" data-tab="plan" role="tab">매도 계획</button>
       <button class="tab" data-tab="compare" role="tab">방법 비교</button>
-      <button class="tab" data-tab="history" role="tab">내역</button>
     </nav>
 
     <main>
@@ -241,30 +241,6 @@
             <input id="today-fx" type="number" step="any" min="0" disabled />
             <p class="hint" id="today-fx-note">조회 중…</p>
           </div>
-          <div class="summary-item">
-            <span class="label">올해 실현손익</span>
-            <output class="figure" id="ytd-gain">—</output>
-            <p class="hint" id="ytd-tax"></p>
-          </div>
-          <div class="summary-item">
-            <span class="label">올해 세금 없이 추가로 실현 가능한 이익</span>
-            <output class="figure" id="headroom">—</output>
-            <p class="hint">이 금액까지는 추가로 실현해도 세금이 없습니다.</p>
-          </div>
-
-          <div class="summary-item">
-            <label class="label" for="domestic-gain">
-              올해 국내주식 양도손익
-              <em class="label-note">해당될 때만 입력 · 손실은 마이너스로</em>
-            </label>
-            <input id="domestic-gain" type="number" step="1" placeholder="0" />
-            <p class="hint">
-              국내주식과 해외주식은 소득세법 제94조제1항제3호로 함께 묶여 손익이 통산되고
-              기본공제 250만원도 나눠 씁니다. 다만 <b>대주주 요건 등에 해당하는 경우에만</b>
-              과세대상이니, 해당 여부를 먼저 확인하세요.
-            </p>
-            <p class="hint is-warning" id="domestic-warning" hidden></p>
-          </div>
         </div>
 
         <section class="card">
@@ -297,6 +273,27 @@
             매도한 해의 직전 사업연도 말 기준으로 판정하므로 해가 바뀌면 다시 확인하세요.
           </p>
           <div id="sim-panel"></div>
+        </section>
+
+        <section class="card" id="lots-card" hidden>
+          <div class="card-head">
+            <h2>남은 매수 로트</h2>
+          </div>
+          <p class="hint" id="lots-note"></p>
+          <div class="table-scroll" id="lots-wrap">
+            <table id="lots-table">
+              <thead>
+                <tr>
+                  <th>종목</th>
+                  <th>취득일 (결제일)</th>
+                  <th class="num">남은 수량</th>
+                  <th class="num">주당 취득가액</th>
+                  <th class="num">취득가액</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </section>
       </section>
 
@@ -426,8 +423,8 @@
           </div>
           <p class="hint">
             실현손익과 예상세액은 이미 판 거래와 켠 계획을 합친 금액입니다. 수수료·제세금은
-            반영하지 않습니다. 보유현황에 입력한 국내주식 손익은 올해 세금에만 합산되고,
-            중소기업 표시도 보유현황에서 한 것을 따릅니다.
+            반영하지 않습니다. 손익·세금 탭에 입력한 국내주식 손익은 올해 세금에만 합산되고,
+            중소기업 표시는 보유현황에서 한 것을 따릅니다.
           </p>
         </section>
       </section>
@@ -446,8 +443,73 @@
         </div>
       </section>
 
-      <section class="panel" data-panel="history">
-        <div class="card placeholder">내역 화면은 다음 단계에서 만듭니다.</div>
+      <section class="panel" data-panel="tax">
+        <div class="card">
+          <div class="card-head">
+            <h2>손익과 세금</h2>
+            <select id="tax-year" class="year-select" aria-label="귀속 연도"></select>
+          </div>
+          <div class="tax-summary">
+            <div class="summary-item">
+              <span class="label">실현손익 <em class="label-note">결제일이 속한 해 기준</em></span>
+              <output class="figure" id="tax-gain">—</output>
+              <p class="hint" id="tax-gain-note"></p>
+            </div>
+            <div class="summary-item">
+              <span class="label">예상세액</span>
+              <output class="figure" id="tax-total">—</output>
+              <p class="hint" id="tax-total-note"></p>
+            </div>
+            <div class="summary-item" id="tax-headroom-item">
+              <span class="label" id="tax-headroom-label">올해 세금 없이 추가로 실현 가능한 이익</span>
+              <output class="figure" id="tax-headroom">—</output>
+              <p class="hint">이 금액까지는 추가로 실현해도 세금이 없습니다.</p>
+            </div>
+          </div>
+          <dl class="sim-result tax-breakdown" id="tax-breakdown"></dl>
+        </div>
+
+        <div class="card">
+          <label class="label" for="domestic-gain">
+            올해 국내주식 양도손익
+            <em class="label-note">해당될 때만 입력 · 손실은 마이너스로</em>
+          </label>
+          <input id="domestic-gain" type="number" step="1" placeholder="0" />
+          <p class="hint">
+            국내주식과 해외주식은 소득세법 제94조제1항제3호로 함께 묶여 손익이 통산되고
+            기본공제 250만원도 나눠 씁니다. 다만 <b>대주주 요건 등에 해당하는 경우에만</b>
+            과세대상이니, 해당 여부를 먼저 확인하세요.
+          </p>
+          <p class="hint" id="domestic-year-note" hidden></p>
+          <p class="hint is-warning" id="domestic-warning" hidden></p>
+        </div>
+
+        <div class="card filing-note" id="tax-filing"></div>
+
+        <section class="card">
+          <div class="card-head">
+            <h2 id="tax-sales-title">확정 매도 내역</h2>
+            <span class="count" id="tax-sales-count"></span>
+          </div>
+          <div class="table-scroll" id="tax-sales-wrap">
+            <table id="tax-sales-table">
+              <thead>
+                <tr>
+                  <th>체결일</th>
+                  <th>결제일</th>
+                  <th>종목</th>
+                  <th class="num">수량</th>
+                  <th class="num">양도가액</th>
+                  <th class="num">취득가액</th>
+                  <th class="num">양도차익</th>
+                  <th class="center">세율</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <p class="empty" id="tax-sales-empty">이 해에 결제된 매도가 없습니다.</p>
+        </section>
       </section>
     </main>
 
