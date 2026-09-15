@@ -1133,3 +1133,25 @@ td.center {
     border-bottom: 1px solid var(--border);
   }
 }
+
+/* 좁은 화면에서 방법 비교 표가 480px 최소 너비 때문에 오른쪽이 잘리지 않게 한다 */
+@media (max-width: 520px) {
+  .compare-table {
+    min-width: 0;
+  }
+
+  .compare-table th,
+  .compare-table td {
+    padding: 8px 6px;
+  }
+
+  .compare-table thead th,
+  .compare-table th[scope="row"] {
+    white-space: normal;
+  }
+
+  .compare-table .is-total th,
+  .compare-table .is-total td {
+    font-size: 14px;
+  }
+}
