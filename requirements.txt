@@ -3,3 +3,4 @@ yfinance
 python-dotenv
 requests
 pytest
+gunicorn

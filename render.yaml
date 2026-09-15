@@ -1,0 +1,19 @@
+# Render 배포 설정. Render에서 이 저장소를 연결하면 이 파일대로 웹 서버를 만든다.
+#
+# 환율 API 키(EXIM_API_KEY)는 여기에 적지 않는다. sync: false로 두면 Render가 배포할 때
+# 값을 물어보고, 이용자가 Render 화면에서 직접 넣는다.
+services:
+  - type: web
+    name: us-tax
+    runtime: python
+    plan: free
+    region: singapore
+    buildCommand: pip install -r requirements.txt
+    # 종가 이력 조회(/api/history)가 1년치면 1분 가까이 걸려 요청 제한 시간을 넉넉히 둔다.
+    # 무료 서버 메모리(512MB)를 넘지 않도록 프로세스는 하나만 두고 스레드로 동시 요청을 받는다.
+    startCommand: gunicorn app:app --workers 1 --threads 8 --timeout 120
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.10
+      - key: EXIM_API_KEY
+        sync: false
