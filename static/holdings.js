@@ -4,6 +4,7 @@
  */
 
 import { COST_METHOD, annualSummary, replay, sellableInfo, simulate, taxFreeHeadroomKrw } from "./engine.js";
+import { loadSettings, settlementDate } from "./settings.js";
 import { loadSmeTickers, saveSmeTickers } from "./storage.js";
 import { isMixedRate, rateLabel } from "./taxview.js";
 
@@ -164,19 +165,21 @@ function simResultHtml(holding) {
 
   if (!saleDate) return '<p class="empty">매도 가정일을 선택해주세요.</p>';
 
-  const info = sellableInfo(transactions, holding.ticker, saleDate);
+  // 귀속 연도와 원장 순서는 결제일로 정한다. 매도 계획과 같은 기준이다.
+  const settleDate = settlementDate(saleDate, loadSettings().settlementDays);
+  const info = sellableInfo(transactions, holding.ticker, settleDate);
   if (!(quantity > 0) || !(targetPrice >= 0)) {
     return `<p class="empty">매도수량과 목표가를 입력해주세요.</p>`;
   }
   if (quantity > info.max) {
     const headline =
       info.max === 0
-        ? `${saleDate} 기준으로는 매도할 수 있는 수량이 없습니다.`
-        : `${saleDate} 기준 최대 ${shares(info.max)}주까지 매도할 수 있습니다.`;
+        ? `결제일 ${settleDate} 기준으로는 매도할 수 있는 수량이 없습니다.`
+        : `결제일 ${settleDate} 기준 최대 ${shares(info.max)}주까지 매도할 수 있습니다.`;
     return `<p class="sim-warning">${headline}${limitReason(info.limitedBy)}</p>`;
   }
 
-  const year = Number(saleDate.slice(0, 4));
+  const year = Number(settleDate.slice(0, 4));
   const outcome = simulate(
     transactions,
     [
@@ -185,6 +188,7 @@ function simResultHtml(holding) {
         type: "sell",
         ticker: holding.ticker,
         date: saleDate,
+        settlement_date: settleDate,
         quantity,
         price_usd: targetPrice,
         fee_usd: 0,
@@ -199,10 +203,13 @@ function simResultHtml(holding) {
   const sale = outcome.simulatedSales[0];
   const isSme = smeTickers.includes(holding.ticker);
 
+  const crossesYear = saleDate.slice(0, 4) !== settleDate.slice(0, 4);
   const yearNote =
-    year === new Date().getFullYear()
+    year === new Date().getFullYear() && !crossesYear
       ? ""
-      : `<p class="sim-yearnote">${year}년 거래로 계산됩니다. 손익통산과 기본공제 250만원 모두 ${year}년 기준으로 따로 적용됩니다.</p>`;
+      : `<p class="sim-yearnote">${
+          crossesYear ? `결제일이 ${settleDate}로 해를 넘겨 ` : ""
+        }${year}년 소득으로 계산됩니다. 손익통산과 기본공제 250만원 모두 ${year}년 기준으로 따로 적용됩니다.</p>`;
 
   return `
     ${yearNote}
@@ -257,7 +264,7 @@ function simulationHtml(holding) {
           <input type="number" step="any" min="0" value="${targetPrice}" data-sim-field="targetPrice" />
         </label>
         <label>
-          <span class="label">매도 가정일 <em class="label-note">이 날짜가 속한 해로 계산됩니다</em></span>
+          <span class="label">매도 가정일 <em class="label-note">결제일이 속한 해로 계산됩니다</em></span>
           <input type="date" value="${state.saleDate}" data-sim-field="saleDate" />
         </label>
       </div>

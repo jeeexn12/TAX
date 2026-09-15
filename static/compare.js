@@ -129,5 +129,6 @@ export function renderCompare(transactions, currentMethod) {
     </div>
     <p class="hint">
       매도 건별 취득가액이 달라져서 생기는 차이입니다. 양도가액은 두 방법이 같습니다.
+      국내주식 손익은 넣지 않고 해외주식 매도분만으로 계산한 세액입니다.
     </p>`;
 }
