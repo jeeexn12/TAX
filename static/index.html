@@ -46,13 +46,14 @@
           <div class="field">
             <label class="label" for="settlement-days">
               결제일 기준
-              <em class="label-note">체결일 + N영업일 · 새로 입력하는 거래에 적용</em>
+              <em class="label-note">매도 · 새로 입력하는 거래에 적용</em>
             </label>
             <div class="inline-field">
               <span>체결일 +</span>
               <input id="settlement-days" type="number" min="0" max="10" step="1" />
               <span>영업일</span>
             </div>
+            <p class="hint">매수는 체결할 때 대금이 빠져나가므로 결제일을 체결일과 같게 둡니다.</p>
             <p class="hint law-quote">
               소득세법 시행령 제178조의5 제1항: “양도가액 및 필요경비를 수령하거나 지출한 날 현재
               「외국환거래법」에 의한 기준환율 또는 재정환율에 의하여 계산한다.”
@@ -174,7 +175,7 @@
               </label>
             </div>
             <input id="fx-rate" type="number" step="any" min="0" disabled placeholder="거래일을 입력하면 자동 조회" />
-            <p class="hint">결제일의 고시환율 (실시간 시세 아님)</p>
+            <p class="hint" id="fx-basis">결제일의 고시환율 (실시간 시세 아님)</p>
             <p class="hint" id="fx-note">거래일을 입력하면 그날 고시환율을 가져옵니다.</p>
           </div>
 

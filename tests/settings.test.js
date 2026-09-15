@@ -1,7 +1,13 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { DEFAULT_SETTINGS, settlementDate } from "../static/settings.js";
+import { DEFAULT_SETTINGS, defaultSettlementDate, settlementDate } from "../static/settings.js";
+
+test("매수 결제일은 체결일, 매도는 체결일 + N영업일", () => {
+  assert.equal(defaultSettlementDate("buy", "2026-12-31", 2), "2026-12-31");
+  assert.equal(defaultSettlementDate("sell", "2026-12-31", 2), "2027-01-04");
+  assert.equal(defaultSettlementDate("buy", "", 2), "");
+});
 
 test("결제일은 체결일에 영업일을 더해 구한다", () => {
   // 2026-03-02는 월요일

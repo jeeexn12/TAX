@@ -51,3 +51,11 @@ export function settlementDate(tradeDate, days) {
   }
   return d.toISOString().slice(0, 10);
 }
+
+/**
+ * 거래 종류에 맞는 기본 결제일. 매수는 체결할 때 결제계좌에서 대금이 바로 빠져나가므로
+ * 체결일과 같고, 매도는 입금까지 걸리는 N영업일을 더한다(2026-09-16 결정).
+ */
+export function defaultSettlementDate(type, tradeDate, days) {
+  return type === "buy" ? tradeDate || "" : settlementDate(tradeDate, days);
+}

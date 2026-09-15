@@ -26,7 +26,7 @@ import {
   tickerCurrency,
   transactionCurrency,
 } from "./currency.js";
-import { COST_METHODS, loadSettings, saveSettings, settlementDate } from "./settings.js";
+import { COST_METHODS, defaultSettlementDate, loadSettings, saveSettings } from "./settings.js";
 import {
   addTransaction,
   addTransactions,
@@ -213,13 +213,16 @@ function applyTypeVisibility() {
   if (type !== "dca") hidePreview();
 }
 
-/** 결제일을 체결일 + N영업일로 다시 계산한다. 사용자가 직접 고친 값은 건드리지 않는다. */
+/**
+ * 결제일을 다시 계산한다. 매수는 체결일, 매도는 체결일 + N영업일.
+ * 사용자가 직접 고친 값은 건드리지 않는다.
+ */
 function refreshSettlementDate({ force = false } = {}) {
   const type = selectedType();
   if (type !== "buy" && type !== "sell") return;
   if (!el.date.value) return;
 
-  const auto = settlementDate(el.date.value, settings.settlementDays);
+  const auto = defaultSettlementDate(type, el.date.value, settings.settlementDays);
   if (force || !el.settlementDate.value || el.settlementDate.dataset.auto !== "false") {
     el.settlementDate.value = auto;
     el.settlementDate.dataset.auto = "true";
@@ -230,7 +233,9 @@ function refreshSettlementDate({ force = false } = {}) {
   const parts = [
     manual
       ? "직접 지정한 결제일입니다."
-      : `체결일 + ${settings.settlementDays}영업일로 계산했습니다.`,
+      : type === "buy"
+        ? "매수는 체결할 때 대금이 빠져나가 결제일을 체결일과 같게 두었습니다."
+        : `체결일 + ${settings.settlementDays}영업일로 계산했습니다.`,
   ];
   if (crossesYear) {
     parts.push(
@@ -242,6 +247,30 @@ function refreshSettlementDate({ force = false } = {}) {
   }
   el.settlementNote.textContent = parts.join(" ");
   el.settlementNote.className = crossesYear ? "hint is-warning" : "hint";
+}
+
+/**
+ * 거래 종류에 맞춰 환율 입력 방식을 정한다. 매수는 증권사 결제내역에 구매가와 환율이 이미
+ * 나오므로 직접 입력이 기본이고, 매도는 결제일 고시환율을 자동 조회한다(2026-09-16 결정).
+ * 체크박스를 바꾸면 어느 쪽이든 다른 방식으로 넣을 수 있다.
+ */
+function applyFxMode() {
+  const type = selectedType();
+  if (type !== "buy" && type !== "sell") return;
+
+  const manual = type === "buy";
+  el.fxManual.checked = manual;
+  el.fxRate.disabled = !manual;
+  el.fxRate.value = "";
+  fxAppliedDate = null;
+  el.fxRate.placeholder = manual ? "결제내역의 환율" : "결제일을 입력하면 자동 조회";
+  document.getElementById("fx-basis").textContent = manual
+    ? "증권사 결제내역에 나온 환율"
+    : "결제일의 고시환율 (실시간 시세 아님)";
+  if (manual) {
+    el.fxNote.textContent = "결제 환율을 직접 입력해주세요.";
+    el.fxNote.className = "hint";
+  }
 }
 
 /** 환율은 체결일이 아니라 결제일(대금 입출금일) 기준으로 조회한다. */
@@ -488,8 +517,9 @@ async function buildPreview() {
 
   try {
     const response = await fetch(
+      // 반복매수도 매수라 결제일 = 체결일이다.
       `/api/history?ticker=${encodeURIComponent(ticker)}&start=${start}&end=${end}` +
-        `&settlement_days=${settings.settlementDays}&currency=${tradeCurrency}`
+        `&settlement_days=0&currency=${tradeCurrency}`
     );
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
@@ -548,7 +578,7 @@ function renderPreview() {
   if (selectedFrequency() === "weekly") {
     notes.push(`매주 기준으로 ${lots.length}회차를 골랐습니다.`);
   }
-  notes.push(`환율은 결제일(체결일 + ${settings.settlementDays}영업일) 기준으로 조회했습니다.`);
+  notes.push("매수라 결제일을 체결일과 같게 두고 그날 고시환율을 조회했습니다.");
   const fallbacks = rows.filter((row) => row.fx_is_fallback).length;
   if (fallbacks) {
     notes.push(`${fallbacks}건은 결제일에 고시가 없어 직전 영업일 환율을 적용했습니다.`);
@@ -749,6 +779,7 @@ function handleSubmit(event) {
   el.quantity.value = "";
   el.price.value = "";
   el.fee.value = "";
+  if (selectedType() === "buy") el.fxRate.value = "";
   el.quantityAfter.value = "";
   el.adjustAmount.value = "";
 
@@ -758,7 +789,7 @@ function handleSubmit(event) {
 }
 
 function renderSettingsSummary() {
-  el.settingsSummary.textContent = `${COST_METHODS[settings.costMethod]} · 결제일 체결일+${
+  el.settingsSummary.textContent = `${COST_METHODS[settings.costMethod]} · 매도 결제일 체결일+${
     settings.settlementDays
   }영업일`;
 }
@@ -824,13 +855,16 @@ function init() {
   syncCurrencyWithTicker();
   el.date.value = today();
   applyTypeVisibility();
+  applyFxMode();
   refreshSettlementDate({ force: true });
   applyRangeLimit();
 
   document.querySelectorAll('input[name="type"]').forEach((radio) =>
     radio.addEventListener("change", () => {
       applyTypeVisibility();
-      refreshSettlementDate();
+      applyFxMode();
+      // 매수와 매도는 기본 결제일이 달라서 종류를 바꾸면 다시 계산한다.
+      refreshSettlementDate({ force: true });
       loadFxForDate();
       validate();
     })
