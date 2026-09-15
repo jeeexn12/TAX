@@ -1059,3 +1059,77 @@ td.center {
 .price-cell small.is-warning {
   color: var(--warning);
 }
+
+/* 종목 검색 */
+.ticker-field {
+  position: relative;
+}
+
+.ticker-suggest {
+  position: absolute;
+  left: 0;
+  z-index: 20;
+  width: max(100%, min(360px, calc(100vw - 48px)));
+  max-height: 320px;
+  margin: 4px 0 0;
+  padding: 4px;
+  overflow-y: auto;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.14);
+}
+
+.ticker-suggest li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.ticker-suggest li.is-active,
+.ticker-suggest li:hover {
+  background: var(--accent-soft);
+}
+
+.ticker-suggest .suggest-meta {
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.ticker-suggest .suggest-empty {
+  color: var(--muted);
+  cursor: default;
+}
+
+.ticker-suggest .suggest-empty:hover {
+  background: none;
+}
+
+/* 좁은 화면에서 거래 종류 버튼 글자가 "매 / 수"처럼 끊기지 않게 한다 */
+.segmented span {
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  #type-picker {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
+  }
+
+  #type-picker span {
+    padding: 8px 10px;
+    text-align: center;
+  }
+
+  #type-picker label:nth-child(2) span {
+    border-right: none;
+  }
+
+  #type-picker label:nth-child(-n + 2) span {
+    border-bottom: 1px solid var(--border);
+  }
+}

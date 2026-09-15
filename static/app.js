@@ -15,6 +15,7 @@ import {
 import { renderCompare } from "./compare.js";
 import { initHoldings, refreshHoldings } from "./holdings.js";
 import { initPlan, refreshPlan } from "./planview.js";
+import { attachTickerSearch } from "./search.js";
 import { initYearly, refreshYearly } from "./yearly.js";
 import {
   CURRENCIES,
@@ -106,7 +107,7 @@ function applyCurrencyLabels() {
   document.querySelectorAll("[data-currency-code]").forEach((node) => (node.textContent = code));
   el.fxUnit.textContent = rateUnitLabel(code);
   el.dcaForeignLabel.textContent = `외화(${code})`;
-  el.ticker.placeholder = currencyInfo(code).example;
+  el.ticker.placeholder = `종목 이름이나 티커 (예: 애플, ${currencyInfo(code).example})`;
 }
 
 /** 이미 입력한 종목이면 그 거래의 통화로 맞춘다. 한 종목은 한 통화로만 받는다. */
@@ -122,7 +123,7 @@ function syncCurrencyWithTicker() {
   }
   el.currencyHint.textContent = existing
     ? `이 종목은 ${currencyInfo(existing).name}(${existing})로 입력된 거래가 있어 같은 통화로 맞췄습니다.`
-    : "미국 외 주식은 7203.T(도쿄), 0700.HK(홍콩)처럼 거래소 표시를 붙여 입력하세요.";
+    : "종목 이름이나 티커로 검색해 고르면 통화가 자동으로 맞춰집니다.";
 }
 
 /** "100주→400주"처럼 수량 변동을 짧게 적는다. 비율만 있던 예전 기록은 배수로 적는다. */
@@ -132,6 +133,46 @@ function quantityChangeText(tx) {
   }
   if (Number(tx.added_quantity) > 0) return `+${number(tx.added_quantity, 8)}주`;
   return `${number(tx.ratio, 4)}배`;
+}
+
+/**
+ * 검색에서 종목을 고르면 통화를 맞춘다. 이미 입력한 종목이면 기존 거래의 통화를 따르고,
+ * 야후 검색 결과처럼 거래소로 추정한 통화면 시세 조회로 실제 호가 통화를 확인한다.
+ */
+async function selectTicker(item) {
+  const existing = tickerCurrency(transactions, item.ticker);
+  let code = existing ?? item.currency;
+
+  if (!existing && !item.currency_verified) {
+    try {
+      const response = await fetch(`/api/price?ticker=${encodeURIComponent(item.ticker)}`);
+      const data = await response.json();
+      if (response.ok && data.currency) code = data.currency;
+    } catch {
+      // 확인하지 못하면 거래소로 추정한 통화를 그대로 쓴다.
+    }
+  }
+  if (el.ticker.value.trim().toUpperCase() !== item.ticker.toUpperCase()) return;
+
+  if (!code || !Object.hasOwn(CURRENCIES, code)) {
+    el.currencyHint.textContent = `${item.ticker}은(는) ${code ?? "알 수 없는"} 통화로 거래되어 이 도구에서 계산할 수 없습니다.`;
+    validate();
+    return;
+  }
+
+  if (code !== selectedTradeCurrency()) {
+    el.tradeCurrency.value = code;
+    applyCurrencyLabels();
+    applyRangeLimit();
+    hidePreview();
+    loadFxForDate();
+  }
+  syncCurrencyWithTicker();
+  if (!existing) {
+    const name = item.name_ko || item.name_en || item.ticker;
+    el.currencyHint.textContent = `${name} (${item.ticker}) · ${currencyInfo(code).name}로 거래하는 종목입니다.`;
+  }
+  validate();
 }
 
 function dateKr(iso) {
@@ -836,6 +877,7 @@ function init() {
   });
 
   el.ticker.addEventListener("input", syncCurrencyWithTicker);
+  attachTickerSearch({ input: el.ticker, onSelect: selectTicker });
 
   [
     el.ticker,

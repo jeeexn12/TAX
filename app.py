@@ -11,6 +11,7 @@ from flask import Flask, jsonify, request, send_from_directory
 
 from services.fx import FxLookupError, get_usd_krw_rate, get_usd_krw_rates
 from services.price import PriceLookupError, get_current_price, get_daily_quotes
+from services.search import search_tickers
 
 MAX_HISTORY_DAYS = 366
 # 브라우저 static/currency.js의 CURRENCIES와 같아야 한다.
@@ -74,6 +75,17 @@ def price():
         return jsonify({"error": str(err)}), 404
     except Exception:
         return jsonify({"error": "시세 서버에 연결하지 못했습니다. 직접 입력해주세요."}), 502
+
+
+@app.get("/api/search")
+def search():
+    """종목 이름(한글·영어)이나 티커로 후보를 찾는다. 검색어 외에는 아무것도 받지 않는다."""
+    query = request.args.get("q", "").strip()
+    if not query:
+        return jsonify({"results": [], "remote_error": False})
+    if len(query) > 50:
+        return jsonify({"error": "검색어가 너무 깁니다."}), 400
+    return jsonify(search_tickers(query))
 
 
 def _settlement_date(trade_day: date, business_days: int) -> date:

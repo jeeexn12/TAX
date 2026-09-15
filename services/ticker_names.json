@@ -1,0 +1,2065 @@
+[
+ {
+  "ticker": "AAPL",
+  "name_ko": "애플",
+  "name_en": "Apple Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MSFT",
+  "name_ko": "마이크로소프트",
+  "name_en": "Microsoft Corporation",
+  "aliases": [
+   "마소"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "NVDA",
+  "name_ko": "엔비디아",
+  "name_en": "NVIDIA Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "AMZN",
+  "name_ko": "아마존",
+  "name_en": "Amazon.com, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "GOOGL",
+  "name_ko": "알파벳 A",
+  "name_en": "Alphabet Inc.",
+  "aliases": [
+   "구글"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "GOOG",
+  "name_ko": "알파벳 C",
+  "name_en": "Alphabet Inc.",
+  "aliases": [
+   "구글"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "META",
+  "name_ko": "메타 플랫폼스",
+  "name_en": "Meta Platforms, Inc.",
+  "aliases": [
+   "페이스북",
+   "메타"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "TSLA",
+  "name_ko": "테슬라",
+  "name_en": "Tesla, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "AVGO",
+  "name_ko": "브로드컴",
+  "name_en": "Broadcom Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "BRK-B",
+  "name_ko": "버크셔 해서웨이 B",
+  "name_en": "Berkshire Hathaway Inc.",
+  "aliases": [
+   "버크셔"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "JPM",
+  "name_ko": "JP모건체이스",
+  "name_en": "JPMorgan Chase & Co.",
+  "aliases": [
+   "제이피모건"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "V",
+  "name_ko": "비자",
+  "name_en": "Visa Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MA",
+  "name_ko": "마스터카드",
+  "name_en": "Mastercard Incorporated",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "UNH",
+  "name_ko": "유나이티드헬스",
+  "name_en": "UnitedHealth Group Incorporated",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "LLY",
+  "name_ko": "일라이 릴리",
+  "name_en": "Eli Lilly and Company",
+  "aliases": [
+   "릴리"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "JNJ",
+  "name_ko": "존슨앤드존슨",
+  "name_en": "Johnson & Johnson",
+  "aliases": [
+   "존슨앤존슨"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "PG",
+  "name_ko": "프록터앤드갬블",
+  "name_en": "The Procter & Gamble Company",
+  "aliases": [
+   "피앤지"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "KO",
+  "name_ko": "코카콜라",
+  "name_en": "The Coca-Cola Company",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "PEP",
+  "name_ko": "펩시코",
+  "name_en": "PepsiCo, Inc.",
+  "aliases": [
+   "펩시"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "COST",
+  "name_ko": "코스트코",
+  "name_en": "Costco Wholesale Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "WMT",
+  "name_ko": "월마트",
+  "name_en": "Walmart Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "HD",
+  "name_ko": "홈디포",
+  "name_en": "The Home Depot, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MCD",
+  "name_ko": "맥도날드",
+  "name_en": "McDonald's Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "NKE",
+  "name_ko": "나이키",
+  "name_en": "NIKE, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SBUX",
+  "name_ko": "스타벅스",
+  "name_en": "Starbucks Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "DIS",
+  "name_ko": "월트 디즈니",
+  "name_en": "The Walt Disney Company",
+  "aliases": [
+   "디즈니"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "NFLX",
+  "name_ko": "넷플릭스",
+  "name_en": "Netflix, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ADBE",
+  "name_ko": "어도비",
+  "name_en": "Adobe Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "CRM",
+  "name_ko": "세일즈포스",
+  "name_en": "Salesforce, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ORCL",
+  "name_ko": "오라클",
+  "name_en": "Oracle Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "INTC",
+  "name_ko": "인텔",
+  "name_en": "Intel Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "AMD",
+  "name_ko": "AMD",
+  "name_en": "Advanced Micro Devices, Inc.",
+  "aliases": [
+   "에이엠디"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "QCOM",
+  "name_ko": "퀄컴",
+  "name_en": "QUALCOMM Incorporated",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "TXN",
+  "name_ko": "텍사스 인스트루먼트",
+  "name_en": "Texas Instruments Incorporated",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MU",
+  "name_ko": "마이크론 테크놀로지",
+  "name_en": "Micron Technology, Inc.",
+  "aliases": [
+   "마이크론"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ASML",
+  "name_ko": "ASML",
+  "name_en": "ASML Holding N.V.",
+  "aliases": [
+   "에이에스엠엘"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "TSM",
+  "name_ko": "TSMC",
+  "name_en": "Taiwan Semiconductor Manufacturing Company Limited",
+  "aliases": [
+   "대만반도체",
+   "티에스엠씨"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ARM",
+  "name_ko": "ARM 홀딩스",
+  "name_en": "Arm Holdings plc",
+  "aliases": [
+   "암홀딩스"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SMCI",
+  "name_ko": "슈퍼 마이크로 컴퓨터",
+  "name_en": "Super Micro Computer, Inc.",
+  "aliases": [
+   "슈마컴",
+   "슈퍼마이크로"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "PLTR",
+  "name_ko": "팔란티어",
+  "name_en": "Palantir Technologies Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SNOW",
+  "name_ko": "스노우플레이크",
+  "name_en": "Snowflake Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "CRWD",
+  "name_ko": "크라우드스트라이크",
+  "name_en": "CrowdStrike Holdings, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "PANW",
+  "name_ko": "팔로알토 네트웍스",
+  "name_en": "Palo Alto Networks, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "NOW",
+  "name_ko": "서비스나우",
+  "name_en": "ServiceNow, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SHOP",
+  "name_ko": "쇼피파이",
+  "name_en": "Shopify Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "UBER",
+  "name_ko": "우버",
+  "name_en": "Uber Technologies, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ABNB",
+  "name_ko": "에어비앤비",
+  "name_en": "Airbnb, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "COIN",
+  "name_ko": "코인베이스",
+  "name_en": "Coinbase Global, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MSTR",
+  "name_ko": "스트래티지",
+  "name_en": "Strategy Inc",
+  "aliases": [
+   "마이크로스트래티지"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "HOOD",
+  "name_ko": "로빈후드",
+  "name_en": "Robinhood Markets, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "RIVN",
+  "name_ko": "리비안",
+  "name_en": "Rivian Automotive, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "LCID",
+  "name_ko": "루시드",
+  "name_en": "Lucid Group, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "NIO",
+  "name_ko": "니오",
+  "name_en": "NIO Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "BABA",
+  "name_ko": "알리바바",
+  "name_en": "Alibaba Group Holding Limited",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "PDD",
+  "name_ko": "PDD 홀딩스",
+  "name_en": "PDD Holdings Inc.",
+  "aliases": [
+   "핀둬둬",
+   "테무"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "JD",
+  "name_ko": "징둥닷컴",
+  "name_en": "JD.com, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "BIDU",
+  "name_ko": "바이두",
+  "name_en": "Baidu, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SPOT",
+  "name_ko": "스포티파이",
+  "name_en": "Spotify Technology S.A.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "PYPL",
+  "name_ko": "페이팔",
+  "name_en": "PayPal Holdings, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "XYZ",
+  "name_ko": "블록",
+  "name_en": "Block, Inc.",
+  "aliases": [
+   "스퀘어"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "IONQ",
+  "name_ko": "아이온큐",
+  "name_en": "IonQ, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "RGTI",
+  "name_ko": "리게티 컴퓨팅",
+  "name_en": "Rigetti Computing, Inc.",
+  "aliases": [
+   "리게티"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "QBTS",
+  "name_ko": "디웨이브 퀀텀",
+  "name_en": "D-Wave Quantum Inc.",
+  "aliases": [
+   "디웨이브"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SOUN",
+  "name_ko": "사운드하운드 AI",
+  "name_en": "SoundHound AI, Inc.",
+  "aliases": [
+   "사운드하운드"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "AI",
+  "name_ko": "C3.ai",
+  "name_en": "C3.ai, Inc.",
+  "aliases": [
+   "씨쓰리에이아이"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "RKLB",
+  "name_ko": "로켓랩",
+  "name_en": "Rocket Lab Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ASTS",
+  "name_ko": "AST 스페이스모바일",
+  "name_en": "AST SpaceMobile, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "OKLO",
+  "name_ko": "오클로",
+  "name_en": "Oklo Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SMR",
+  "name_ko": "뉴스케일 파워",
+  "name_en": "NuScale Power Corporation",
+  "aliases": [
+   "뉴스케일"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "CEG",
+  "name_ko": "컨스텔레이션 에너지",
+  "name_en": "Constellation Energy Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "VST",
+  "name_ko": "비스트라",
+  "name_en": "Vistra Corp.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "NEE",
+  "name_ko": "넥스트에라 에너지",
+  "name_en": "NextEra Energy, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "XOM",
+  "name_ko": "엑슨모빌",
+  "name_en": "ExxonMobil Holdings Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "CVX",
+  "name_ko": "셰브론",
+  "name_en": "Chevron Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "OXY",
+  "name_ko": "옥시덴탈 페트롤리엄",
+  "name_en": "Occidental Petroleum Corporation",
+  "aliases": [
+   "옥시덴탈"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "BA",
+  "name_ko": "보잉",
+  "name_en": "The Boeing Company",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "LMT",
+  "name_ko": "록히드 마틴",
+  "name_en": "Lockheed Martin Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "RTX",
+  "name_ko": "RTX",
+  "name_en": "RTX Corporation",
+  "aliases": [
+   "레이시온"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "GE",
+  "name_ko": "GE 에어로스페이스",
+  "name_en": "GE Aerospace",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "CAT",
+  "name_ko": "캐터필러",
+  "name_en": "Caterpillar Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "DE",
+  "name_ko": "디어앤컴퍼니",
+  "name_en": "Deere & Company",
+  "aliases": [
+   "존디어"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "F",
+  "name_ko": "포드",
+  "name_en": "Ford Motor Company",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "GM",
+  "name_ko": "제너럴 모터스",
+  "name_en": "General Motors Company",
+  "aliases": [
+   "지엠"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "T",
+  "name_ko": "AT&T",
+  "name_en": "AT&T Inc.",
+  "aliases": [
+   "에이티앤티"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "VZ",
+  "name_ko": "버라이즌",
+  "name_en": "Verizon Communications Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "O",
+  "name_ko": "리얼티 인컴",
+  "name_en": "Realty Income Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MO",
+  "name_ko": "알트리아",
+  "name_en": "Altria Group, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "PM",
+  "name_ko": "필립모리스",
+  "name_en": "Philip Morris International Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ABBV",
+  "name_ko": "애브비",
+  "name_en": "AbbVie Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "PFE",
+  "name_ko": "화이자",
+  "name_en": "Pfizer Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MRK",
+  "name_ko": "머크",
+  "name_en": "Merck & Co., Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MRNA",
+  "name_ko": "모더나",
+  "name_en": "Moderna, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "NVO",
+  "name_ko": "노보 노디스크",
+  "name_en": "Novo Nordisk A/S",
+  "aliases": [
+   "노보노디스크"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "BAC",
+  "name_ko": "뱅크오브아메리카",
+  "name_en": "Bank of America Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "WFC",
+  "name_ko": "웰스파고",
+  "name_en": "Wells Fargo & Company",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "GS",
+  "name_ko": "골드만삭스",
+  "name_en": "The Goldman Sachs Group, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MS",
+  "name_ko": "모건스탠리",
+  "name_en": "Morgan Stanley",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "C",
+  "name_ko": "씨티그룹",
+  "name_en": "Citigroup Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SCHW",
+  "name_ko": "찰스 슈왑",
+  "name_en": "The Charles Schwab Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "BLK",
+  "name_ko": "블랙록",
+  "name_en": "BlackRock, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "AXP",
+  "name_ko": "아메리칸 익스프레스",
+  "name_en": "American Express Company",
+  "aliases": [
+   "아멕스"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "IBM",
+  "name_ko": "IBM",
+  "name_en": "International Business Machines Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "CSCO",
+  "name_ko": "시스코",
+  "name_en": "Cisco Systems, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "DELL",
+  "name_ko": "델 테크놀로지스",
+  "name_en": "Dell Technologies Inc.",
+  "aliases": [
+   "델"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ANET",
+  "name_ko": "아리스타 네트웍스",
+  "name_en": "Arista Networks, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "VRT",
+  "name_ko": "버티브",
+  "name_en": "Vertiv Holdings Co",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "LRCX",
+  "name_ko": "램리서치",
+  "name_en": "Lam Research Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "AMAT",
+  "name_ko": "어플라이드 머티어리얼즈",
+  "name_en": "Applied Materials, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "KLAC",
+  "name_ko": "KLA",
+  "name_en": "KLA Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MRVL",
+  "name_ko": "마벨 테크놀로지",
+  "name_en": "Marvell Technology, Inc.",
+  "aliases": [
+   "마벨"
+  ],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ON",
+  "name_ko": "온세미",
+  "name_en": "ON Semiconductor Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "TTD",
+  "name_ko": "더 트레이드 데스크",
+  "name_en": "The Trade Desk, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "RBLX",
+  "name_ko": "로블록스",
+  "name_en": "Roblox Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SONY",
+  "name_ko": "소니 (미국 ADR)",
+  "name_en": "Sony Group Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "TM",
+  "name_ko": "도요타 (미국 ADR)",
+  "name_en": "Toyota Motor Corporation",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "CPNG",
+  "name_ko": "쿠팡",
+  "name_en": "Coupang, Inc.",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SE",
+  "name_ko": "씨 리미티드",
+  "name_en": "Sea Limited",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "GRAB",
+  "name_ko": "그랩",
+  "name_en": "Grab Holdings Limited",
+  "aliases": [],
+  "currency": "USD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SPY",
+  "name_ko": "SPDR S&P 500 ETF",
+  "name_en": "State Street SPDR S&P 500 ETF Trust",
+  "aliases": [
+   "S&P500",
+   "에스앤피500",
+   "스파이"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "VOO",
+  "name_ko": "뱅가드 S&P 500 ETF",
+  "name_en": "Vanguard S&P 500 ETF",
+  "aliases": [
+   "S&P500",
+   "에스앤피500"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "IVV",
+  "name_ko": "아이셰어즈 코어 S&P 500 ETF",
+  "name_en": "iShares Core S&P 500 ETF",
+  "aliases": [
+   "S&P500",
+   "에스앤피500"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SPYM",
+  "name_ko": "SPDR 포트폴리오 S&P 500 ETF",
+  "name_en": "State Street SPDR Portfolio S&P 500 ETF",
+  "aliases": [
+   "S&P500",
+   "에스앤피500",
+   "SPLG"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "QQQ",
+  "name_ko": "인베스코 QQQ (나스닥100)",
+  "name_en": "Invesco QQQ Trust",
+  "aliases": [
+   "나스닥100",
+   "나스닥"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "QQQM",
+  "name_ko": "인베스코 나스닥100 ETF",
+  "name_en": "Invesco NASDAQ 100 ETF",
+  "aliases": [
+   "나스닥100",
+   "나스닥"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "VTI",
+  "name_ko": "뱅가드 토탈 스톡마켓 ETF",
+  "name_en": "Vanguard Morningstar Total Stock Market ETF",
+  "aliases": [
+   "미국 전체"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "VT",
+  "name_ko": "뱅가드 토탈 월드 스톡 ETF",
+  "name_en": "Vanguard Total World Stock Index Fund ETF Shares",
+  "aliases": [
+   "전세계"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SCHD",
+  "name_ko": "슈왑 미국 배당주 ETF",
+  "name_en": "Schwab U.S. Dividend Equity ETF",
+  "aliases": [
+   "배당",
+   "슈드"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "JEPI",
+  "name_ko": "JP모건 프리미엄 인컴 ETF",
+  "name_en": "JPMorgan Equity Premium Income ETF",
+  "aliases": [
+   "커버드콜",
+   "배당"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "JEPQ",
+  "name_ko": "JP모건 나스닥 프리미엄 인컴 ETF",
+  "name_en": "JPMorgan Nasdaq Equity Premium Income ETF",
+  "aliases": [
+   "커버드콜",
+   "나스닥"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "QYLD",
+  "name_ko": "글로벌X 나스닥100 커버드콜 ETF",
+  "name_en": "Global X NASDAQ 100 Covered Call ETF",
+  "aliases": [
+   "커버드콜",
+   "나스닥"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "DIA",
+  "name_ko": "SPDR 다우존스 ETF",
+  "name_en": "State Street SPDR Dow Jones Industrial Average ETF Trust",
+  "aliases": [
+   "다우"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "IWM",
+  "name_ko": "아이셰어즈 러셀 2000 ETF",
+  "name_en": "iShares Russell 2000 ETF",
+  "aliases": [
+   "러셀2000"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SOXX",
+  "name_ko": "아이셰어즈 반도체 ETF",
+  "name_en": "iShares Semiconductor ETF",
+  "aliases": [
+   "반도체"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SMH",
+  "name_ko": "반에크 반도체 ETF",
+  "name_en": "VanEck Semiconductor ETF",
+  "aliases": [
+   "반도체"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "XLK",
+  "name_ko": "기술주 섹터 SPDR ETF",
+  "name_en": "State Street Technology Select Sector SPDR ETF",
+  "aliases": [
+   "기술주"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "XLE",
+  "name_ko": "에너지 섹터 SPDR ETF",
+  "name_en": "State Street Energy Select Sector SPDR ETF",
+  "aliases": [
+   "에너지"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "XLF",
+  "name_ko": "금융 섹터 SPDR ETF",
+  "name_en": "State Street Financial Select Sector SPDR ETF",
+  "aliases": [
+   "금융"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "ARKK",
+  "name_ko": "ARK 이노베이션 ETF",
+  "name_en": "ARK Innovation ETF",
+  "aliases": [
+   "아크",
+   "캐시우드"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "TLT",
+  "name_ko": "아이셰어즈 미국채 20년+ ETF",
+  "name_en": "iShares 20+ Year Treasury Bond ETF",
+  "aliases": [
+   "미국채",
+   "장기채"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SGOV",
+  "name_ko": "아이셰어즈 0-3개월 미국채 ETF",
+  "name_en": "iShares 0-3 Month Treasury Bond ETF",
+  "aliases": [
+   "단기채",
+   "미국채"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "BIL",
+  "name_ko": "SPDR 1-3개월 미국채 ETF",
+  "name_en": "State Street SPDR Bloomberg 1-3 Month T-Bill ETF",
+  "aliases": [
+   "단기채",
+   "미국채"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "GLD",
+  "name_ko": "SPDR 금 ETF",
+  "name_en": "SPDR Gold Shares",
+  "aliases": [
+   "금",
+   "골드"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "IAU",
+  "name_ko": "아이셰어즈 금 ETF",
+  "name_en": "iShares Gold Trust",
+  "aliases": [
+   "금",
+   "골드"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SLV",
+  "name_ko": "아이셰어즈 은 ETF",
+  "name_en": "iShares Silver Trust",
+  "aliases": [
+   "은",
+   "실버"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "USO",
+  "name_ko": "미국 원유 ETF",
+  "name_en": "United States Oil Fund, LP",
+  "aliases": [
+   "원유"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "IBIT",
+  "name_ko": "아이셰어즈 비트코인 ETF",
+  "name_en": "iShares Bitcoin Trust ETF",
+  "aliases": [
+   "비트코인"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "VNQ",
+  "name_ko": "뱅가드 부동산 리츠 ETF",
+  "name_en": "Vanguard Real Estate Index Fund ETF Shares",
+  "aliases": [
+   "리츠"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "VIG",
+  "name_ko": "뱅가드 배당성장 ETF",
+  "name_en": "Vanguard Dividend Appreciation Index Fund ETF Shares",
+  "aliases": [
+   "배당성장",
+   "배당"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "TQQQ",
+  "name_ko": "나스닥100 3배 (프로셰어즈 울트라프로 QQQ)",
+  "name_en": "ProShares UltraPro QQQ",
+  "aliases": [
+   "나스닥 3배",
+   "나스닥 레버리지",
+   "티큐"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SQQQ",
+  "name_ko": "나스닥100 -3배 인버스 (프로셰어즈)",
+  "name_en": "ProShares UltraPro Short QQQ",
+  "aliases": [
+   "나스닥 인버스",
+   "나스닥 -3배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "QLD",
+  "name_ko": "나스닥100 2배 (프로셰어즈 울트라 QQQ)",
+  "name_en": "ProShares Ultra QQQ",
+  "aliases": [
+   "나스닥 2배",
+   "나스닥 레버리지"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "PSQ",
+  "name_ko": "나스닥100 인버스 (프로셰어즈 숏 QQQ)",
+  "name_en": "ProShares Short QQQ",
+  "aliases": [
+   "나스닥 인버스"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "UPRO",
+  "name_ko": "S&P 500 3배 (프로셰어즈)",
+  "name_en": "ProShares UltraPro S&P500",
+  "aliases": [
+   "S&P500 3배",
+   "에스앤피 3배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SPXL",
+  "name_ko": "S&P 500 3배 (디렉시온)",
+  "name_en": "Direxion Daily S&P500 Bull 3X Shares",
+  "aliases": [
+   "S&P500 3배",
+   "에스앤피 3배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SSO",
+  "name_ko": "S&P 500 2배 (프로셰어즈)",
+  "name_en": "ProShares Ultra S&P500",
+  "aliases": [
+   "S&P500 2배",
+   "에스앤피 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SPXU",
+  "name_ko": "S&P 500 -3배 인버스 (프로셰어즈)",
+  "name_en": "ProShares UltraPro Short S&P500",
+  "aliases": [
+   "S&P500 인버스",
+   "에스앤피 인버스"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SH",
+  "name_ko": "S&P 500 인버스 (프로셰어즈)",
+  "name_en": "ProShares Short S&P500",
+  "aliases": [
+   "S&P500 인버스",
+   "에스앤피 인버스"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SOXL",
+  "name_ko": "반도체 3배 (디렉시온)",
+  "name_en": "Direxion Daily Semiconductor Bull 3X Shares",
+  "aliases": [
+   "반도체 3배",
+   "반도체 레버리지",
+   "속슬"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "SOXS",
+  "name_ko": "반도체 -3배 인버스 (디렉시온)",
+  "name_en": "Direxion Daily Semiconductor Bear 3X Shares",
+  "aliases": [
+   "반도체 인버스",
+   "속스"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "USD",
+  "name_ko": "반도체 2배 (프로셰어즈 울트라 반도체)",
+  "name_en": "ProShares Ultra Semiconductors",
+  "aliases": [
+   "반도체 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "TECL",
+  "name_ko": "기술주 3배 (디렉시온)",
+  "name_en": "Direxion Daily Technology Bull 3X Shares",
+  "aliases": [
+   "기술주 3배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "LABU",
+  "name_ko": "바이오 3배 (디렉시온)",
+  "name_en": "Direxion Daily S&P Biotech Bull 3X Shares",
+  "aliases": [
+   "바이오 3배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "TNA",
+  "name_ko": "러셀2000 3배 (디렉시온)",
+  "name_en": "Direxion Daily Small Cap Bull 3X Shares",
+  "aliases": [
+   "러셀 3배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "UDOW",
+  "name_ko": "다우존스 3배 (프로셰어즈)",
+  "name_en": "ProShares UltraPro Dow30",
+  "aliases": [
+   "다우 3배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "TMF",
+  "name_ko": "미국채 20년+ 3배 (디렉시온)",
+  "name_en": "Direxion Daily 20+ Year Treasury Bull 3X Shares",
+  "aliases": [
+   "미국채 3배",
+   "장기채 3배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "NVDL",
+  "name_ko": "엔비디아 2배 (그래나이트셰어즈)",
+  "name_en": "GraniteShares 2x Long NVDA Daily ETF",
+  "aliases": [
+   "엔비디아 2배",
+   "엔비디아 레버리지"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "NVDU",
+  "name_ko": "엔비디아 2배 (디렉시온)",
+  "name_en": "Direxion Daily Nvda Bull 2X Shares",
+  "aliases": [
+   "엔비디아 2배",
+   "엔비디아 레버리지"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "NVDX",
+  "name_ko": "엔비디아 2배 (T-Rex)",
+  "name_en": "T-Rex 2X Long NVIDIA Daily Target ETF",
+  "aliases": [
+   "엔비디아 2배",
+   "엔비디아 레버리지"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "TSLL",
+  "name_ko": "테슬라 2배 (디렉시온)",
+  "name_en": "Direxion Daily TSLA Bull 2X Shares",
+  "aliases": [
+   "테슬라 2배",
+   "테슬라 레버리지"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "TSLQ",
+  "name_ko": "테슬라 -2배 인버스 (트레이드알)",
+  "name_en": "Tradr 2X Short TSLA Daily ETF",
+  "aliases": [
+   "테슬라 인버스"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "TSLS",
+  "name_ko": "테슬라 인버스 (디렉시온)",
+  "name_en": "Direxion Daily TSLA Bear 1X Shares",
+  "aliases": [
+   "테슬라 인버스"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "AAPU",
+  "name_ko": "애플 2배 (디렉시온)",
+  "name_en": "Direxion Daily AAPL Bull 2X Shares",
+  "aliases": [
+   "애플 2배",
+   "애플 레버리지"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "AMZU",
+  "name_ko": "아마존 2배 (디렉시온)",
+  "name_en": "Direxion Daily AMZN Bull 2X Shares",
+  "aliases": [
+   "아마존 2배",
+   "아마존 레버리지"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "MSFU",
+  "name_ko": "마이크로소프트 2배 (디렉시온)",
+  "name_en": "Direxion Daily MSFT Bull 2X Shares",
+  "aliases": [
+   "마이크로소프트 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "GGLL",
+  "name_ko": "구글 2배 (디렉시온)",
+  "name_en": "Direxion Daily GOOGL Bull 2X Shares",
+  "aliases": [
+   "구글 2배",
+   "알파벳 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "METU",
+  "name_ko": "메타 2배 (디렉시온)",
+  "name_en": "Direxion Daily META Bull 2X ETF",
+  "aliases": [
+   "메타 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "CONL",
+  "name_ko": "코인베이스 2배 (그래나이트셰어즈)",
+  "name_en": "GraniteShares 2x Long COIN Daily ETF",
+  "aliases": [
+   "코인베이스 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "MSTU",
+  "name_ko": "스트래티지 2배 (T-Rex)",
+  "name_en": "T-Rex 2X Long MSTR Daily Target ETF",
+  "aliases": [
+   "마이크로스트래티지 2배",
+   "스트래티지 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "MSTX",
+  "name_ko": "스트래티지 2배 (디파이언스)",
+  "name_en": "Defiance Daily Target 2X Long MSTR ETF",
+  "aliases": [
+   "마이크로스트래티지 2배",
+   "스트래티지 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "PLTU",
+  "name_ko": "팔란티어 2배 (디렉시온)",
+  "name_en": "Direxion Daily PLTR Bull 2X Shares",
+  "aliases": [
+   "팔란티어 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "AMDL",
+  "name_ko": "AMD 2배 (그래나이트셰어즈)",
+  "name_en": "GraniteShares 2x Long AMD Daily ETF",
+  "aliases": [
+   "AMD 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "BITX",
+  "name_ko": "비트코인 2배 (볼라틸리티셰어즈)",
+  "name_en": "2x Bitcoin Strategy ETF",
+  "aliases": [
+   "비트코인 2배",
+   "비트코인 레버리지"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "ETHU",
+  "name_ko": "이더리움 2배 (볼라틸리티셰어즈)",
+  "name_en": "2x Ether ETF",
+  "aliases": [
+   "이더리움 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "YINN",
+  "name_ko": "중국 3배 (디렉시온)",
+  "name_en": "Direxion Daily FTSE China Bull 3X Shares",
+  "aliases": [
+   "중국 3배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "UVXY",
+  "name_ko": "VIX 변동성 1.5배 (프로셰어즈)",
+  "name_en": "ProShares Ultra VIX Short-Term Futures ETF",
+  "aliases": [
+   "변동성",
+   "빅스"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "BOIL",
+  "name_ko": "천연가스 2배 (프로셰어즈)",
+  "name_en": "ProShares Ultra Bloomberg Natural Gas",
+  "aliases": [
+   "천연가스 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "UCO",
+  "name_ko": "원유 2배 (프로셰어즈)",
+  "name_en": "ProShares Ultra Bloomberg Crude Oil",
+  "aliases": [
+   "원유 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "NUGT",
+  "name_ko": "금광주 2배 (디렉시온)",
+  "name_en": "Direxion Daily Gold Miners Index Bull 2X Shares",
+  "aliases": [
+   "금광 2배"
+  ],
+  "currency": "USD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "7203.T",
+  "name_ko": "도요타 자동차",
+  "name_en": "Toyota Motor Corporation",
+  "aliases": [
+   "토요타",
+   "도요타"
+  ],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "6758.T",
+  "name_ko": "소니 그룹",
+  "name_en": "Sony Group Corporation",
+  "aliases": [
+   "소니"
+  ],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "9984.T",
+  "name_ko": "소프트뱅크 그룹",
+  "name_en": "SoftBank Group Corp.",
+  "aliases": [
+   "소프트뱅크"
+  ],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "7974.T",
+  "name_ko": "닌텐도",
+  "name_en": "Nintendo Co., Ltd.",
+  "aliases": [],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "8306.T",
+  "name_ko": "미쓰비시 UFJ 파이낸셜",
+  "name_en": "Mitsubishi UFJ Financial Group, Inc.",
+  "aliases": [
+   "미쓰비시UFJ"
+  ],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "6861.T",
+  "name_ko": "키엔스",
+  "name_en": "Keyence Corporation",
+  "aliases": [],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "8035.T",
+  "name_ko": "도쿄 일렉트론",
+  "name_en": "Tokyo Electron Limited",
+  "aliases": [],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "9983.T",
+  "name_ko": "패스트 리테일링",
+  "name_en": "Fast Retailing Co., Ltd.",
+  "aliases": [
+   "유니클로"
+  ],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "6501.T",
+  "name_ko": "히타치",
+  "name_en": "Hitachi, Ltd.",
+  "aliases": [],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "7011.T",
+  "name_ko": "미쓰비시 중공업",
+  "name_en": "Mitsubishi Heavy Industries, Ltd.",
+  "aliases": [],
+  "currency": "JPY",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "0700.HK",
+  "name_ko": "텐센트",
+  "name_en": "Tencent Holdings Limited",
+  "aliases": [],
+  "currency": "HKD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "9988.HK",
+  "name_ko": "알리바바 (홍콩)",
+  "name_en": "Alibaba Group Holding Limited",
+  "aliases": [
+   "알리바바"
+  ],
+  "currency": "HKD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "1211.HK",
+  "name_ko": "BYD (홍콩)",
+  "name_en": "BYD Company Limited",
+  "aliases": [
+   "비야디"
+  ],
+  "currency": "HKD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "3690.HK",
+  "name_ko": "메이퇀",
+  "name_en": "Meituan",
+  "aliases": [],
+  "currency": "HKD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "1810.HK",
+  "name_ko": "샤오미",
+  "name_en": "Xiaomi Corporation",
+  "aliases": [],
+  "currency": "HKD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "2318.HK",
+  "name_ko": "핑안보험",
+  "name_en": "Ping An Insurance (Group) Company of China, Ltd.",
+  "aliases": [],
+  "currency": "HKD",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "2800.HK",
+  "name_ko": "트래커 펀드 오브 홍콩 (항셍지수)",
+  "name_en": "Tracker Fund Of Hong Kong",
+  "aliases": [
+   "항셍"
+  ],
+  "currency": "HKD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "3033.HK",
+  "name_ko": "CSOP 항셍테크 ETF",
+  "name_en": "CSOP ETF Series - CSOP Hang Seng TECH Index ETF",
+  "aliases": [
+   "항셍테크"
+  ],
+  "currency": "HKD",
+  "type": "ETF"
+ },
+ {
+  "ticker": "600519.SS",
+  "name_ko": "구이저우 마오타이",
+  "name_en": "Kweichow Moutai Co., Ltd.",
+  "aliases": [
+   "마오타이"
+  ],
+  "currency": "CNH",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "300750.SZ",
+  "name_ko": "CATL (닝더스다이)",
+  "name_en": "Contemporary Amperex Technology Co., Limited",
+  "aliases": [
+   "닝더스다이"
+  ],
+  "currency": "CNH",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "002594.SZ",
+  "name_ko": "BYD (선전)",
+  "name_en": "BYD Company Limited",
+  "aliases": [
+   "비야디"
+  ],
+  "currency": "CNH",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SAP.DE",
+  "name_ko": "SAP (독일)",
+  "name_en": "SAP SE",
+  "aliases": [
+   "에스에이피"
+  ],
+  "currency": "EUR",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SIE.DE",
+  "name_ko": "지멘스",
+  "name_en": "Siemens Aktiengesellschaft",
+  "aliases": [],
+  "currency": "EUR",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "RHM.DE",
+  "name_ko": "라인메탈",
+  "name_en": "Rheinmetall AG",
+  "aliases": [],
+  "currency": "EUR",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ADS.DE",
+  "name_ko": "아디다스",
+  "name_en": "adidas AG",
+  "aliases": [],
+  "currency": "EUR",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ASML.AS",
+  "name_ko": "ASML (암스테르담)",
+  "name_en": "ASML Holding N.V.",
+  "aliases": [],
+  "currency": "EUR",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "MC.PA",
+  "name_ko": "LVMH",
+  "name_en": "LVMH Moët Hennessy - Louis Vuitton, Société Européenne",
+  "aliases": [
+   "루이비통"
+  ],
+  "currency": "EUR",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "AIR.PA",
+  "name_ko": "에어버스",
+  "name_en": "Airbus SE",
+  "aliases": [],
+  "currency": "EUR",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "SHEL.L",
+  "name_ko": "셸 (런던)",
+  "name_en": "Shell plc",
+  "aliases": [
+   "쉘"
+  ],
+  "currency": "GBP",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "AZN.L",
+  "name_ko": "아스트라제네카",
+  "name_en": "AstraZeneca PLC",
+  "aliases": [],
+  "currency": "GBP",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "HSBA.L",
+  "name_ko": "HSBC",
+  "name_en": "HSBC Holdings plc",
+  "aliases": [],
+  "currency": "GBP",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "BP.L",
+  "name_ko": "BP",
+  "name_en": "BP p.l.c.",
+  "aliases": [],
+  "currency": "GBP",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "RR.L",
+  "name_ko": "롤스로이스",
+  "name_en": "Rolls-Royce Holdings plc",
+  "aliases": [],
+  "currency": "GBP",
+  "type": "EQUITY"
+ },
+ {
+  "ticker": "ULVR.L",
+  "name_ko": "유니레버",
+  "name_en": "Unilever PLC",
+  "aliases": [],
+  "currency": "GBP",
+  "type": "EQUITY"
+ }
+]
