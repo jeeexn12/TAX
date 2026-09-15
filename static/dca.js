@@ -56,19 +56,21 @@ export function scheduledDates({ start, end, frequency, tradingDates }) {
 /**
  * 회차별 매수금액에서 수량을 역산한다.
  *
- * 원화 정액이면 그날 환율로 달러로 바꾼 뒤 종가로 나누고, 외화 정액이면 바로
+ * 원화 정액이면 그날 환율로 거래 통화로 바꾼 뒤 종가로 나누고, 외화 정액이면 바로
  * 종가로 나눈다. 소수점 수량이 나오는 건 소수점 매수 서비스의 실제 동작과 같다.
  */
-export function buildLots({ ticker, currency, amount, rows }) {
+export function buildLots({ ticker, currency, amount, rows, tradeCurrency = "USD" }) {
   return rows.map((row) => {
-    const amountUsd = currency === "KRW" ? amount / row.fx_rate : amount;
+    const close = row.close ?? row.close_usd;
+    const amountForeign = currency === "KRW" ? amount / row.fx_rate : amount;
     return {
       type: "buy",
       ticker,
+      currency: tradeCurrency,
       date: row.date,
       settlement_date: row.settlement_date ?? null,
-      quantity: amountUsd / row.close_usd,
-      price_usd: row.close_usd,
+      quantity: amountForeign / close,
+      price_usd: close,
       fee_usd: 0,
       fx_rate: row.fx_rate,
       fx_applied_date: row.fx_applied_date,

@@ -5,6 +5,7 @@
  * 항목을 고쳐도 engine.js가 전체를 다시 계산하므로 이후 수치가 함께 갱신된다.
  */
 
+import { normalizeCurrency } from "./currency.js";
 import { loadPlanBook, normalizePlanBook, savePlanBook } from "./plan.js";
 
 const STORAGE_KEY = "us-tax:transactions";
@@ -120,6 +121,7 @@ export function validateTransactions(raw) {
       id: typeof tx.id === "string" && tx.id ? tx.id : newId(),
       type: tx.type,
       ticker: tx.ticker.trim().toUpperCase(),
+      currency: normalizeCurrency(tx.currency),
       date: tx.date,
       settlement_date: tx.settlement_date ?? null,
       quantity: Number(tx.quantity),

@@ -124,3 +124,20 @@ test("다음 구간 시작일은 마지막 로트 다음 날이다", () => {
   assert.equal(nextStartDate(lots), "2026-03-14");
   assert.equal(nextStartDate([]), null);
 });
+
+test("반복매수 로트에 거래 통화를 남기고 원화 금액을 그 통화로 바꿔 수량을 구한다", () => {
+  const lots = buildLots({
+    ticker: "7203.T",
+    currency: "KRW",
+    amount: 100_000,
+    tradeCurrency: "JPY",
+    rows: [
+      { date: "2026-03-02", settlement_date: "2026-03-04", close: 2500, fx_rate: 8.5, fx_applied_date: "2026-03-04" },
+    ],
+  });
+
+  assert.equal(lots[0].currency, "JPY");
+  assert.equal(lots[0].price_usd, 2500);
+  // 10만원 / 1엔당 8.5원 = 11,764.7엔 -> 2,500엔으로 나눈다
+  assert.ok(Math.abs(lots[0].quantity - 100_000 / 8.5 / 2500) < 1e-12);
+});

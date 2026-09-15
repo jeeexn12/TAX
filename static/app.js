@@ -10,6 +10,15 @@ import { renderCompare } from "./compare.js";
 import { initHoldings, refreshHoldings } from "./holdings.js";
 import { initPlan, refreshPlan } from "./planview.js";
 import { initYearly, refreshYearly } from "./yearly.js";
+import {
+  CURRENCIES,
+  currencyInfo,
+  displayRate,
+  rateUnitLabel,
+  storedRate,
+  tickerCurrency,
+  transactionCurrency,
+} from "./currency.js";
 import { COST_METHODS, loadSettings, saveSettings, settlementDate } from "./settings.js";
 import {
   addTransaction,
@@ -27,6 +36,10 @@ const BLOCKED_SILENTLY = Symbol("blocked");
 const el = {
   form: document.getElementById("tx-form"),
   ticker: document.getElementById("ticker"),
+  tradeCurrency: document.getElementById("trade-currency"),
+  currencyHint: document.getElementById("currency-hint"),
+  fxUnit: document.getElementById("fx-unit"),
+  dcaForeignLabel: document.getElementById("dca-foreign-label"),
   date: document.getElementById("date"),
   settlementDate: document.getElementById("settlement-date"),
   settlementNote: document.getElementById("settlement-note"),
@@ -76,6 +89,33 @@ const today = () => new Date().toISOString().slice(0, 10);
 const selectedType = () => document.querySelector('input[name="type"]:checked').value;
 const selectedCurrency = () => document.querySelector('input[name="currency"]:checked').value;
 const selectedFrequency = () => document.querySelector('input[name="frequency"]:checked').value;
+const selectedTradeCurrency = () => el.tradeCurrency.value;
+const roundRate = (value) => Number(Number(value).toFixed(4));
+
+/** 단가·수수료·환율 라벨을 고른 통화에 맞춘다. */
+function applyCurrencyLabels() {
+  const code = selectedTradeCurrency();
+  document.querySelectorAll("[data-currency-code]").forEach((node) => (node.textContent = code));
+  el.fxUnit.textContent = rateUnitLabel(code);
+  el.dcaForeignLabel.textContent = `외화(${code})`;
+  el.ticker.placeholder = currencyInfo(code).example;
+}
+
+/** 이미 입력한 종목이면 그 거래의 통화로 맞춘다. 한 종목은 한 통화로만 받는다. */
+function syncCurrencyWithTicker() {
+  const ticker = el.ticker.value.trim().toUpperCase();
+  const existing = ticker ? tickerCurrency(transactions, ticker) : null;
+  if (existing && existing !== selectedTradeCurrency()) {
+    el.tradeCurrency.value = existing;
+    applyCurrencyLabels();
+    applyRangeLimit();
+    hidePreview();
+    loadFxForDate();
+  }
+  el.currencyHint.textContent = existing
+    ? `이 종목은 ${currencyInfo(existing).name}(${existing})로 입력된 거래가 있어 같은 통화로 맞췄습니다.`
+    : "미국 외 주식은 7203.T(도쿄), 0700.HK(홍콩)처럼 거래소 표시를 붙여 입력하세요.";
+}
 
 function dateKr(iso) {
   const [, m, d] = iso.split("-");
@@ -106,6 +146,7 @@ function applyTypeVisibility() {
   show('[data-only="trade"]', type === "buy" || type === "sell");
   show('[data-only="split"]', type === "split");
   show('[data-only="dca"]', type === "dca");
+  show('[data-only="priced"]', type !== "split");
 
   el.submit.textContent =
     type === "dca" ? "미리보기 만들기" : type === "split" ? "주식분할 추가" : "거래 추가";
@@ -159,12 +200,13 @@ async function loadFxForDate() {
   fxAppliedDate = null;
 
   try {
-    const response = await fetch(`/api/fx?date=${date}`);
+    const code = selectedTradeCurrency();
+    const response = await fetch(`/api/fx?date=${date}&currency=${code}`);
     const data = await response.json();
     if (token !== fxRequestToken) return;
     if (!response.ok) throw new Error(data.error);
 
-    el.fxRate.value = data.rate;
+    el.fxRate.value = roundRate(displayRate(data.rate, code));
     fxAppliedDate = data.applied_date;
 
     if (date > today()) {
@@ -227,11 +269,13 @@ function buildTransaction() {
 
   return {
     ...base,
+    currency: selectedTradeCurrency(),
     settlement_date: el.settlementDate.value || null,
     quantity: Number(el.quantity.value),
+    // price_usd·fee_usd는 달러만 받던 때의 이름이다. 값은 거래 통화 기준이다.
     price_usd: Number(el.price.value),
     fee_usd: Number(el.fee.value || 0),
-    fx_rate: Number(el.fxRate.value),
+    fx_rate: storedRate(Number(el.fxRate.value), selectedTradeCurrency()),
     fx_applied_date: el.fxManual.checked ? null : fxAppliedDate,
     fx_manual: el.fxManual.checked,
     source: "manual",
@@ -241,6 +285,14 @@ function buildTransaction() {
 function findError() {
   const type = selectedType();
   if (!el.ticker.value.trim()) return "티커를 입력해주세요.";
+
+  if (type !== "split") {
+    const ticker = el.ticker.value.trim().toUpperCase();
+    const existing = tickerCurrency(transactions, ticker);
+    if (existing && existing !== selectedTradeCurrency()) {
+      return `${ticker}은(는) 이미 ${existing}로 입력된 거래가 있습니다. 한 종목은 한 통화로만 입력할 수 있습니다.`;
+    }
+  }
 
   if (type === "dca") {
     if (!(Number(el.dcaAmount.value) > 0)) return "1회 매수금액을 입력해주세요.";
@@ -297,7 +349,7 @@ function applyRangeLimit() {
   el.dcaAmountHint.textContent =
     selectedCurrency() === "KRW"
       ? "회차마다 이 금액(원)어치를 매수합니다."
-      : "회차마다 이 금액(달러)어치를 매수합니다.";
+      : `회차마다 이 금액(${currencyInfo(selectedTradeCurrency()).name})어치를 매수합니다.`;
 
   const { end, clamped } = clampRange(el.dcaStart.value, el.dcaEnd.value);
   if (clamped) {
@@ -319,6 +371,7 @@ async function buildPreview() {
   const ticker = el.ticker.value.trim().toUpperCase();
   const amount = Number(el.dcaAmount.value);
   const currency = selectedCurrency();
+  const tradeCurrency = selectedTradeCurrency();
   const frequency = selectedFrequency();
   const start = el.dcaStart.value;
   const end = el.dcaEnd.value;
@@ -330,10 +383,15 @@ async function buildPreview() {
   try {
     const response = await fetch(
       `/api/history?ticker=${encodeURIComponent(ticker)}&start=${start}&end=${end}` +
-        `&settlement_days=${settings.settlementDays}`
+        `&settlement_days=${settings.settlementDays}&currency=${tradeCurrency}`
     );
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
+    if (data.quote_currency && data.quote_currency !== tradeCurrency) {
+      throw new Error(
+        `${ticker} 시세는 ${data.quote_currency} 기준인데 선택한 통화는 ${tradeCurrency}입니다. 티커와 통화를 확인해주세요.`
+      );
+    }
 
     const byDate = new Map(data.rows.map((row) => [row.date, row]));
     const picked = scheduledDates({
@@ -343,7 +401,7 @@ async function buildPreview() {
       tradingDates: data.rows.map((row) => row.date),
     });
     const rows = picked.map((d) => byDate.get(d));
-    const lots = buildLots({ ticker, currency, amount, rows });
+    const lots = buildLots({ ticker, currency, amount, rows, tradeCurrency });
 
     dcaPreview = { lots, rows, start, end, requested: data.rows.length };
     renderPreview();
@@ -368,7 +426,7 @@ function renderPreview() {
       <td>${lot.date}</td>
       <td class="${crossesYear ? "year-cross" : ""}">${lot.settlement_date ?? "—"}</td>
       <td class="num">${number(lot.price_usd, 4)}</td>
-      <td class="num">${number(lot.fx_rate, 2)}${
+      <td class="num">${number(displayRate(lot.fx_rate, lot.currency), 2)}${
         rows[i].fx_is_fallback ? `<br /><small class="muted">${dateKr(rows[i].fx_applied_date)} 고시</small>` : ""
       }</td>
       <td class="num">${number(lot.quantity, 6)}</td>
@@ -446,6 +504,7 @@ function renderTable() {
 function readRow(tx) {
   const row = document.createElement("tr");
   const isSplit = tx.type === "split";
+  const code = transactionCurrency(tx);
   const badge =
     tx.source === "dca"
       ? `<span class="tag ${tx.corrected ? "tag-fixed" : ""}">${tx.corrected ? "정정됨" : "자동생성"}</span>`
@@ -463,9 +522,15 @@ function readRow(tx) {
     <td><span class="pill pill-${tx.type}">${TYPE_LABELS[tx.type]}</span>${badge}</td>
     <td class="ticker">${tx.ticker}</td>
     <td class="num">${isSplit ? `${number(tx.ratio, 4)}배` : number(tx.quantity, 8)}</td>
-    <td class="num">${isSplit ? "—" : number(tx.price_usd, 4)}</td>
+    <td class="num">${isSplit ? "—" : `${number(tx.price_usd, 4)} <small class="muted">${code}</small>`}</td>
     <td class="num">${isSplit ? "—" : number(tx.fee_usd, 4)}</td>
-    <td class="num">${isSplit ? "—" : number(tx.fx_rate, 2) + (tx.fx_manual ? " ✎" : "")}</td>
+    <td class="num">${
+      isSplit
+        ? "—"
+        : number(displayRate(tx.fx_rate, code), 2) +
+          (tx.fx_manual ? " ✎" : "") +
+          (currencyInfo(code).unit > 1 ? `<br /><small class="muted">${rateUnitLabel(code)}</small>` : "")
+    }</td>
     <td class="num row-actions">
       ${isSplit ? "" : `<button type="button" class="link" data-edit="${tx.id}">정정</button>`}
       <button type="button" class="link-danger" data-delete="${tx.id}">삭제</button>
@@ -484,7 +549,7 @@ function editRow(tx) {
     <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${tx.quantity}" data-field="quantity" /></td>
     <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${tx.price_usd}" data-field="price_usd" /></td>
     <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${tx.fee_usd}" data-field="fee_usd" /></td>
-    <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${tx.fx_rate}" data-field="fx_rate" /></td>
+    <td class="num"><input class="cell-input" type="number" step="any" min="0" value="${roundRate(displayRate(tx.fx_rate, transactionCurrency(tx)))}" data-field="fx_rate" /></td>
     <td class="num row-actions">
       <button type="button" class="link" data-save="${tx.id}">저장</button>
       <button type="button" class="link" data-cancel="1">취소</button>
@@ -506,6 +571,8 @@ function commitEdit(id) {
   }
 
   const original = transactions.find((tx) => tx.id === id);
+  // 화면에는 고시 단위(엔화는 100엔)로 보여주므로 저장 단위로 되돌린다.
+  fields.fx_rate = storedRate(fields.fx_rate, transactionCurrency(original));
   if (fields.settlement_date && fields.settlement_date < original.date) {
     showRowError("결제일이 체결일보다 빠릅니다.");
     return;
@@ -643,6 +710,11 @@ function setupSettings() {
 function init() {
   setupTabs();
   setupSettings();
+  el.tradeCurrency.innerHTML = Object.values(CURRENCIES)
+    .map((c) => `<option value="${c.code}">${c.code} · ${c.name}</option>`)
+    .join("");
+  applyCurrencyLabels();
+  syncCurrencyWithTicker();
   el.date.value = today();
   applyTypeVisibility();
   refreshSettlementDate({ force: true });
@@ -688,6 +760,16 @@ function init() {
     }
     validate();
   });
+
+  el.tradeCurrency.addEventListener("change", () => {
+    applyCurrencyLabels();
+    applyRangeLimit();
+    hidePreview();
+    loadFxForDate();
+    validate();
+  });
+
+  el.ticker.addEventListener("input", syncCurrencyWithTicker);
 
   [el.ticker, el.quantity, el.price, el.fee, el.ratio, el.fxRate, el.dcaAmount].forEach((input) =>
     input.addEventListener("input", validate)

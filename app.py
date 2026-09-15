@@ -10,9 +10,11 @@ from datetime import date, timedelta
 from flask import Flask, jsonify, request, send_from_directory
 
 from services.fx import FxLookupError, get_usd_krw_rate, get_usd_krw_rates
-from services.price import PriceLookupError, get_current_price_usd, get_daily_closes
+from services.price import PriceLookupError, get_current_price, get_daily_quotes
 
 MAX_HISTORY_DAYS = 366
+# 브라우저 static/currency.js의 CURRENCIES와 같아야 한다.
+SUPPORTED_CURRENCIES = ("USD", "JPY", "HKD", "CNH", "EUR", "GBP")
 
 app = Flask(__name__, static_folder="static", static_url_path="")
 
@@ -22,8 +24,18 @@ def index():
     return send_from_directory("static", "index.html")
 
 
+def _currency_arg():
+    """화면에서 고를 수 있는 통화만 받는다. 없으면 달러로 본다."""
+    code = request.args.get("currency", "USD").strip().upper()
+    return code if code in SUPPORTED_CURRENCIES else None
+
+
 @app.get("/api/fx")
 def fx():
+    currency = _currency_arg()
+    if currency is None:
+        return jsonify({"error": "지원하지 않는 통화입니다."}), 400
+
     raw_date = request.args.get("date", "")
     try:
         target = date.fromisoformat(raw_date)
@@ -31,7 +43,7 @@ def fx():
         return jsonify({"error": "날짜 형식이 올바르지 않습니다. (예: 2026-01-15)"}), 400
 
     try:
-        result = get_usd_krw_rate(target)
+        result = get_usd_krw_rate(target, currency=currency)
     except FxLookupError as err:
         return jsonify({"error": str(err)}), 502
     except Exception:
@@ -39,6 +51,7 @@ def fx():
 
     return jsonify(
         {
+            "currency": currency,
             "rate": result.rate,
             "applied_date": result.applied_date.isoformat(),
             "applied_label": result.applied_label,
@@ -54,7 +67,9 @@ def price():
         return jsonify({"error": "티커를 입력해주세요."}), 400
 
     try:
-        return jsonify({"ticker": ticker, "price_usd": get_current_price_usd(ticker)})
+        quote, currency = get_current_price(ticker)
+        # price_usd는 달러만 받던 때의 필드 이름이다. 값은 currency 기준 가격이다.
+        return jsonify({"ticker": ticker, "price": quote, "price_usd": quote, "currency": currency})
     except PriceLookupError as err:
         return jsonify({"error": str(err)}), 404
     except Exception:
@@ -83,6 +98,10 @@ def history():
     if not ticker:
         return jsonify({"error": "티커를 입력해주세요."}), 400
 
+    currency = _currency_arg()
+    if currency is None:
+        return jsonify({"error": "지원하지 않는 통화입니다."}), 400
+
     try:
         settlement_days = int(request.args.get("settlement_days", 2))
     except ValueError:
@@ -104,7 +123,7 @@ def history():
     end = min(end, date.today())
 
     try:
-        closes = get_daily_closes(ticker, start, end)
+        closes, quote_currency = get_daily_quotes(ticker, start, end)
     except PriceLookupError as err:
         return jsonify({"error": str(err)}), 404
     except Exception:
@@ -113,7 +132,7 @@ def history():
     settlements = {d: _settlement_date(d, settlement_days) for d, _ in closes}
 
     try:
-        rates = get_usd_krw_rates(list(settlements.values()))
+        rates = get_usd_krw_rates(list(settlements.values()), currency=currency)
     except FxLookupError as err:
         return jsonify({"error": str(err)}), 502
     except Exception:
@@ -122,11 +141,14 @@ def history():
     return jsonify(
         {
             "ticker": ticker,
+            "currency": currency,
+            "quote_currency": quote_currency,
             "settlement_days": settlement_days,
             "rows": [
                 {
                     "date": d.isoformat(),
                     "settlement_date": settlements[d].isoformat(),
+                    "close": round(close, 4),
                     "close_usd": round(close, 4),
                     "fx_rate": rates[settlements[d]].rate,
                     "fx_applied_date": rates[settlements[d]].applied_date.isoformat(),

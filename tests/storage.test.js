@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { buildExportPayload, normalizeSmeTickers } from "../static/storage.js";
+import { buildExportPayload, normalizeSmeTickers, validateTransactions } from "../static/storage.js";
 import { isMixedRate, rateLabel } from "../static/taxview.js";
 
 test("중소기업 종목 목록은 대문자로 맞추고 중복과 빈 값을 뺀다", () => {
@@ -40,4 +40,17 @@ test("20%만 있으면 세율별로 나눠 보여주지 않는다", () => {
   assert.equal(isMixedRate({ byRate: [{ ratePercent: 10 }] }), true);
   assert.equal(rateLabel(10), "10% 중소기업");
   assert.equal(rateLabel(20), "20%");
+});
+
+test("거래 통화는 목록에 있는 것만 받고, 없거나 모르는 통화면 달러로 본다", () => {
+  const [japan, legacy, unknown] = validateTransactions([
+    { type: "buy", ticker: "7203.t", date: "2026-03-02", quantity: 1, price_usd: 2500, fx_rate: 8.7, currency: "JPY" },
+    { type: "buy", ticker: "AAPL", date: "2026-03-02", quantity: 1, price_usd: 180, fx_rate: 1345 },
+    { type: "sell", ticker: "X", date: "2026-03-02", quantity: 1, price_usd: 1, fx_rate: 1, currency: "KRW" },
+  ]);
+
+  assert.equal(japan.currency, "JPY");
+  assert.equal(japan.ticker, "7203.T");
+  assert.equal(legacy.currency, "USD");
+  assert.equal(unknown.currency, "USD");
 });

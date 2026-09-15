@@ -1,20 +1,31 @@
 /**
  * 보유현황 화면. 평가와 시뮬레이션에만 쓰는 값이므로, 여기 환율은 거래입력의
  * 확정 고시환율과 성격이 다르다. 화면에서도 "오늘 참고환율"로 구분해 부른다.
+ *
+ * 종목마다 거래 통화가 다를 수 있어 오늘 참고환율도 보유 종목의 통화별로 따로 둔다.
  */
 
 import { COST_METHOD, replay, sellableInfo, simulate } from "./engine.js";
+import {
+  DEFAULT_CURRENCY,
+  currencyInfo,
+  displayRate,
+  formatMoney,
+  rateUnitLabel,
+  sliderRange,
+  storedRate,
+  tickerCurrency,
+} from "./currency.js";
 import { loadSettings, settlementDate } from "./settings.js";
 import { loadSmeTickers, saveSmeTickers } from "./storage.js";
 import { isMixedRate, rateLabel } from "./taxview.js";
 
-const FX_SLIDER = { min: 1250, max: 1500, step: 10 };
 const TYPE_LABELS = { buy: "매수", sell: "매도", split: "주식분할" };
+/** 오늘 달러 환율을 못 가져왔을 때 시뮬레이션 슬라이더를 놓을 자리. */
+const USD_FALLBACK_RATE = 1350;
 
 const el = {
-  todayFx: document.getElementById("today-fx"),
-  todayFxManual: document.getElementById("today-fx-manual"),
-  todayFxNote: document.getElementById("today-fx-note"),
+  todayFxList: document.getElementById("today-fx-list"),
   tableBody: document.querySelector("#holdings-table tbody"),
   empty: document.getElementById("holdings-empty"),
   count: document.getElementById("holdings-count"),
@@ -31,28 +42,32 @@ const DOMESTIC_GAIN_KEY = "us-tax:domestic-gain";
 const won = (value) => `₩${Math.round(value).toLocaleString("ko-KR")}`;
 const signedWon = (value) =>
   `${value >= 0 ? "+" : "−"}₩${Math.abs(Math.round(value)).toLocaleString("ko-KR")}`;
-const usd = (value) =>
-  `$${Number(value).toLocaleString("ko-KR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const shares = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 8 });
 const today = () => new Date().toISOString().slice(0, 10);
 const dateKr = (iso) => {
   const [, m, d] = iso.split("-");
   return `${Number(m)}월 ${Number(d)}일`;
 };
+const roundRate = (value) => Number(Number(value).toFixed(4));
+const fxText = (display, code) =>
+  `${Number(display).toLocaleString("ko-KR")}원 · ${rateUnitLabel(code)}`;
 
 let transactions = [];
 let costMethod = COST_METHOD.FIFO;
 let smeTickers = [];
-let todayFxRate = null;
+/** 통화별 오늘 참고환율. rate는 1통화당 원화(저장 단위)다. */
+const todayFx = new Map();
 const prices = new Map();
 const sim = new Map();
 let expanded = null;
 
 const methodLabel = () => (costMethod === COST_METHOD.FIFO ? "선입선출법" : "이동평균법");
+const holdingCurrency = (ticker) => tickerCurrency(transactions, ticker) ?? DEFAULT_CURRENCY;
+const todayRate = (code) => todayFx.get(code)?.rate ?? null;
 
-function clampToSlider(rate) {
-  const stepped = Math.round(rate / FX_SLIDER.step) * FX_SLIDER.step;
-  return Math.min(FX_SLIDER.max, Math.max(FX_SLIDER.min, stepped));
+function clampToRange(value, range) {
+  const stepped = Math.round(value / range.step) * range.step;
+  return roundRate(Math.min(range.max, Math.max(range.min, stepped)));
 }
 
 function simStateFor(ticker, holding) {
@@ -61,29 +76,46 @@ function simStateFor(ticker, holding) {
       quantity: holding.quantity,
       targetPrice: prices.get(ticker)?.value ?? null,
       saleDate: today(),
-      fxRate: clampToSlider(todayFxRate ?? 1350),
+      fxRate: null,
     });
   }
   return sim.get(ticker);
 }
 
-async function loadTodayFx() {
-  if (el.todayFxManual.checked) return;
-  el.todayFxNote.textContent = "조회 중…";
+/**
+ * 환율 가정 슬라이더 범위를 정하고 가정값(화면 단위)을 범위 안으로 맞춘다.
+ * 달러 외 통화는 오늘 환율이 있어야 범위를 잡을 수 있다.
+ */
+function prepareSimFx(state, code) {
+  const rate = todayRate(code);
+  const range = sliderRange(code, rate ? displayRate(rate, code) : null);
+  if (!range) return null;
+  const start = state.fxRate ?? (rate ? displayRate(rate, code) : USD_FALLBACK_RATE);
+  state.fxRate = clampToRange(start, range);
+  return range;
+}
+
+async function loadTodayFx(code) {
+  todayFx.set(code, { rate: null, manual: false, note: "조회 중…", warning: false });
   try {
-    const response = await fetch(`/api/fx?date=${today()}`);
+    const response = await fetch(`/api/fx?date=${today()}&currency=${code}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
-    todayFxRate = data.rate;
-    el.todayFx.value = data.rate;
-    el.todayFxNote.textContent = `${dateKr(data.applied_date)} 고시환율 기준 (가장 최근 고시)`;
-    el.todayFxNote.className = "hint";
+    todayFx.set(code, {
+      rate: data.rate,
+      manual: false,
+      note: `${dateKr(data.applied_date)} 고시환율 기준 (가장 최근 고시)`,
+      warning: false,
+    });
   } catch (err) {
-    el.todayFxManual.checked = true;
-    el.todayFx.disabled = false;
-    el.todayFxNote.textContent = `${err.message} 환율을 직접 입력해주세요.`;
-    el.todayFxNote.className = "hint is-warning";
+    todayFx.set(code, {
+      rate: null,
+      manual: true,
+      note: `${err.message} 환율을 직접 입력해주세요.`,
+      warning: true,
+    });
   }
+  render();
 }
 
 async function loadPrice(ticker) {
@@ -95,9 +127,10 @@ async function loadPrice(ticker) {
     const response = await fetch(`/api/price?ticker=${encodeURIComponent(ticker)}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
-    // 미국 주식은 센트 단위로 호가되므로 소수점 이하 긴 꼬리는 표시상 잡음이다.
+    // 소수점 이하 긴 꼬리는 표시상 잡음이라 호가 단위 수준에서 자른다.
     prices.set(ticker, {
-      value: Math.round(data.price_usd * 100) / 100,
+      value: Math.round((data.price ?? data.price_usd) * 100) / 100,
+      currency: data.currency ?? null,
       manual: false,
       loading: false,
       error: null,
@@ -113,6 +146,28 @@ function activeHoldings() {
   return [...holdings.values()]
     .filter((holding) => holding.quantity > 0)
     .sort((a, b) => (a.ticker < b.ticker ? -1 : 1));
+}
+
+function renderTodayFx(codes) {
+  el.todayFxList.innerHTML = codes
+    .map((code) => {
+      const entry = todayFx.get(code) ?? { rate: null, manual: false, note: "조회 중…" };
+      const value = entry.rate ? roundRate(displayRate(entry.rate, code)) : "";
+      return `
+        <div class="today-fx-row">
+          <div class="summary-head">
+            <span class="label">${rateUnitLabel(code)} <em class="label-note">${currencyInfo(code).name}</em></span>
+            <label class="checkbox">
+              <input type="checkbox" data-fx-manual="${code}" ${entry.manual ? "checked" : ""} />
+              <span>직접 입력</span>
+            </label>
+          </div>
+          <input type="number" step="any" min="0" value="${value}" data-fx-input="${code}"
+            aria-label="${code} 오늘 참고환율" ${entry.manual ? "" : "disabled"} />
+          <p class="hint ${entry.warning ? "is-warning" : ""}">${entry.note}</p>
+        </div>`;
+    })
+    .join("");
 }
 
 /** 선입선출법에서 아직 팔리지 않은 매수 로트. 위에서부터 먼저 팔린 것으로 계산한다. */
@@ -155,6 +210,7 @@ function limitReason(limitedBy) {
 }
 
 function simResultHtml(holding) {
+  const code = holdingCurrency(holding.ticker);
   const state = simStateFor(holding.ticker, holding);
   const price = prices.get(holding.ticker);
   const targetPrice = state.targetPrice ?? price?.value ?? 0;
@@ -162,6 +218,9 @@ function simResultHtml(holding) {
   const saleDate = state.saleDate;
 
   if (!saleDate) return '<p class="empty">매도 가정일을 선택해주세요.</p>';
+  if (!prepareSimFx(state, code)) {
+    return `<p class="sim-warning">오늘 ${rateUnitLabel(code)} 참고환율이 없어 계산할 수 없습니다. 위에서 직접 입력해주세요.</p>`;
+  }
 
   // 귀속 연도와 원장 순서는 결제일로 정한다. 매도 계획과 같은 기준이다.
   const settleDate = settlementDate(saleDate, loadSettings().settlementDays);
@@ -188,12 +247,13 @@ function simResultHtml(holding) {
         id: "__sim__",
         type: "sell",
         ticker: holding.ticker,
+        currency: code,
         date: saleDate,
         settlement_date: settleDate,
         quantity,
         price_usd: targetPrice,
         fee_usd: 0,
-        fx_rate: state.fxRate,
+        fx_rate: storedRate(state.fxRate, code),
       },
     ],
     year,
@@ -246,9 +306,27 @@ function taxBaseRowsHtml(tax) {
 }
 
 function simulationHtml(holding) {
+  const code = holdingCurrency(holding.ticker);
   const state = simStateFor(holding.ticker, holding);
+  const range = prepareSimFx(state, code);
   const price = prices.get(holding.ticker);
   const targetPrice = state.targetPrice ?? price?.value ?? 0;
+
+  const fxBlock = range
+    ? `
+      <div class="sim-fx">
+        <div class="sim-fx-head">
+          <span class="label">환율 가정 <em class="label-note">매도 시점 환율을 가정해봅니다</em></span>
+          <strong class="fx-value" id="sim-fx-value">${fxText(state.fxRate, code)}</strong>
+        </div>
+        <input type="range" min="${range.min}" max="${range.max}" step="${range.step}"
+               value="${state.fxRate}" data-sim-field="fxRate" />
+        <div class="sim-fx-scale">
+          <span>${range.min.toLocaleString("ko-KR")}원</span>
+          <span>${range.max.toLocaleString("ko-KR")}원</span>
+        </div>
+      </div>`
+    : "";
 
   return `
     <div class="sim" data-sim="${holding.ticker}">
@@ -259,8 +337,8 @@ function simulationHtml(holding) {
           <input type="number" step="any" min="0" value="${state.quantity}" data-sim-field="quantity" />
         </label>
         <label>
-          <span class="label">목표가 (USD) <em class="label-note">${
-            price?.value ? `현재 ${usd(price.value)}` : "시세 없음"
+          <span class="label">목표가 (${code}) <em class="label-note">${
+            price?.value ? `현재 ${formatMoney(price.value, code)}` : "시세 없음"
           }</em></span>
           <input type="number" step="any" min="0" value="${targetPrice}" data-sim-field="targetPrice" />
         </label>
@@ -269,18 +347,7 @@ function simulationHtml(holding) {
           <input type="date" value="${state.saleDate}" data-sim-field="saleDate" />
         </label>
       </div>
-      <div class="sim-fx">
-        <div class="sim-fx-head">
-          <span class="label">환율 가정 <em class="label-note">매도 시점 환율을 가정해봅니다</em></span>
-          <strong class="fx-value" id="sim-fx-value">${state.fxRate.toLocaleString("ko-KR")}원</strong>
-        </div>
-        <input type="range" min="${FX_SLIDER.min}" max="${FX_SLIDER.max}" step="${FX_SLIDER.step}"
-               value="${state.fxRate}" data-sim-field="fxRate" />
-        <div class="sim-fx-scale">
-          <span>${FX_SLIDER.min.toLocaleString("ko-KR")}원</span>
-          <span>${FX_SLIDER.max.toLocaleString("ko-KR")}원</span>
-        </div>
-      </div>
+      ${fxBlock}
       <div id="sim-result">${simResultHtml(holding)}</div>
     </div>`;
 }
@@ -292,8 +359,34 @@ function refreshSimResult() {
   slot.innerHTML = simResultHtml(holding);
 }
 
-function render() {
+/** 시세 통화가 거래 통화와 다르면 티커나 통화를 잘못 넣은 것이라 평가하지 않는다. */
+function isQuoteMismatch(price, code) {
+  return Boolean(price?.currency && !price.manual && price.currency !== code);
+}
+
+function priceCellHtml(holding, code) {
+  const price = prices.get(holding.ticker);
+  if (price?.loading) return '<span class="muted">조회 중…</span>';
+  if (price?.error && !price.manual) return '<span class="muted">시세 없음</span>';
+
+  const mismatch = isQuoteMismatch(price, code);
+  return `<input class="price-input" type="number" step="any" min="0" value="${price?.value ?? ""}"
+            data-price="${holding.ticker}" ${price?.manual ? "" : "disabled"} />
+          <label class="checkbox inline"><input type="checkbox" data-price-manual="${holding.ticker}"
+            ${price?.manual ? "checked" : ""} /><span>직접</span></label>
+          <br /><small class="${mismatch ? "is-warning" : "muted"}">${
+            mismatch ? `시세는 ${price.currency} 기준, 거래는 ${code}` : code
+          }</small>`;
+}
+
+function render({ skipFx = false } = {}) {
   const holdings = activeHoldings();
+  const codes = [...new Set(holdings.map((holding) => holdingCurrency(holding.ticker)))];
+  if (!codes.length) codes.push(DEFAULT_CURRENCY);
+  for (const code of codes) {
+    if (!todayFx.has(code)) loadTodayFx(code);
+  }
+  if (!skipFx) renderTodayFx(codes);
   renderLots(holdings);
 
   // 선입선출법에서는 잔여 로트의 가중평균이라 "이동평균단가"가 아니다.
@@ -302,20 +395,13 @@ function render() {
 
   el.tableBody.innerHTML = "";
   for (const holding of holdings) {
+    const code = holdingCurrency(holding.ticker);
     const price = prices.get(holding.ticker);
-    const hasValue = Boolean(price?.value) && todayFxRate;
-    const marketKrw = hasValue ? price.value * holding.quantity * todayFxRate : null;
+    const rate = todayRate(code);
+    const hasValue = Boolean(price?.value) && Boolean(rate) && !isQuoteMismatch(price, code);
+    const marketKrw = hasValue ? price.value * holding.quantity * rate : null;
     const gain = hasValue ? marketKrw - holding.totalCostKrw : null;
     const isOpen = expanded === holding.ticker;
-
-    const priceCell = price?.loading
-      ? '<span class="muted">조회 중…</span>'
-      : price?.error
-        ? '<span class="muted">시세 없음</span>'
-        : `<input class="price-input" type="number" step="any" min="0" value="${price?.value ?? ""}"
-             data-price="${holding.ticker}" ${price?.manual ? "" : "disabled"} />
-           <label class="checkbox inline"><input type="checkbox" data-price-manual="${holding.ticker}"
-             ${price?.manual ? "checked" : ""} /><span>직접</span></label>`;
 
     const row = document.createElement("tr");
     row.className = isOpen ? "is-open" : "";
@@ -324,7 +410,7 @@ function render() {
       <td class="num">${shares(holding.quantity)}</td>
       <td class="num">${won(holding.avgCostKrw)}</td>
       <td class="num">${won(holding.totalCostKrw)}</td>
-      <td class="num price-cell">${priceCell}</td>
+      <td class="num price-cell">${priceCellHtml(holding, code)}</td>
       <td class="num">${marketKrw === null ? "—" : won(marketKrw)}</td>
       <td class="num ${gain === null ? "" : gain >= 0 ? "gain-up" : "gain-down"}">
         ${
@@ -377,7 +463,10 @@ function handleSimInput(event) {
   state[field] = field === "saleDate" ? event.target.value : Number(event.target.value);
 
   if (field === "fxRate") {
-    document.getElementById("sim-fx-value").textContent = `${state.fxRate.toLocaleString("ko-KR")}원`;
+    document.getElementById("sim-fx-value").textContent = fxText(
+      state.fxRate,
+      holdingCurrency(ticker)
+    );
   }
   refreshSimResult();
 }
@@ -414,6 +503,29 @@ function handleTableClick(event) {
   }
 }
 
+function handleTodayFxChange(event) {
+  const code = event.target.dataset.fxManual;
+  if (!code) return;
+  if (event.target.checked) {
+    const entry = todayFx.get(code) ?? {};
+    todayFx.set(code, { ...entry, manual: true, note: "직접 입력한 환율로 평가합니다.", warning: false });
+    render();
+  } else {
+    loadTodayFx(code);
+    render();
+  }
+}
+
+/** 환율을 입력하는 중에는 환율 칸을 다시 그리지 않는다. 커서가 튀기 때문이다. */
+function handleTodayFxInput(event) {
+  const code = event.target.dataset.fxInput;
+  if (!code) return;
+  const entry = todayFx.get(code) ?? {};
+  const display = Number(event.target.value);
+  todayFx.set(code, { ...entry, rate: display > 0 ? storedRate(display, code) : null });
+  render({ skipFx: true });
+}
+
 export function refreshHoldings(latestTransactions, method = COST_METHOD.FIFO) {
   transactions = latestTransactions;
   costMethod = method;
@@ -423,24 +535,11 @@ export function refreshHoldings(latestTransactions, method = COST_METHOD.FIFO) {
 export function initHoldings() {
   smeTickers = loadSmeTickers();
 
-  el.todayFxManual.addEventListener("change", () => {
-    el.todayFx.disabled = !el.todayFxManual.checked;
-    if (el.todayFxManual.checked) {
-      el.todayFxNote.textContent = "직접 입력한 환율로 평가합니다.";
-      el.todayFxNote.className = "hint";
-    } else {
-      loadTodayFx().then(render);
-    }
-  });
-
-  el.todayFx.addEventListener("input", () => {
-    todayFxRate = Number(el.todayFx.value) || null;
-    render();
-  });
-
+  el.todayFxList.addEventListener("change", handleTodayFxChange);
+  el.todayFxList.addEventListener("input", handleTodayFxInput);
   el.tableBody.addEventListener("input", handlePriceInput);
   el.tableBody.addEventListener("click", handleTableClick);
   el.simPanel.addEventListener("input", handleSimInput);
 
-  loadTodayFx().then(render);
+  render();
 }

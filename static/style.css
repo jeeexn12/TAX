@@ -1033,3 +1033,29 @@ td.center {
   margin: 0 0 8px;
   padding-left: 1.2rem;
 }
+
+/* 다통화 */
+#tx-form select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+
+.today-fx-list {
+  display: grid;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.today-fx-row + .today-fx-row {
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+.price-cell small.is-warning {
+  color: var(--warning);
+}

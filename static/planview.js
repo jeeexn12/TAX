@@ -1,9 +1,20 @@
 /**
  * 매도 계획 화면. 이름 붙인 계획을 여러 개 두고, 계획마다 팔 줄을 적어 켜고 끄며
  * 세금과 손에 남는 돈을 비교한다. 계산은 plan.js가 하고 여기서는 입력과 표시만 맡는다.
+ *
+ * 계획 줄의 환율(fxRate)은 거래 기록과 같이 1통화당 원화로 저장하고, 엔화처럼 100단위로
+ * 고시되는 통화는 화면에서만 단위를 곱해 보여준다.
  */
 
 import { COST_METHOD, replay } from "./engine.js";
+import {
+  DEFAULT_CURRENCY,
+  displayRate,
+  formatMoney,
+  rateUnitLabel,
+  storedRate,
+  tickerCurrency,
+} from "./currency.js";
 import {
   activePlan,
   addPlan,
@@ -31,8 +42,10 @@ const el = {
   ticker: document.getElementById("plan-ticker"),
   quantity: document.getElementById("plan-quantity"),
   price: document.getElementById("plan-price"),
+  priceUnit: document.getElementById("plan-price-unit"),
   date: document.getElementById("plan-date"),
   fx: document.getElementById("plan-fx"),
+  fxUnit: document.getElementById("plan-fx-unit"),
   add: document.getElementById("plan-add"),
   formNote: document.getElementById("plan-form-note"),
   tableBody: document.querySelector("#plan-table tbody"),
@@ -54,16 +67,19 @@ const signedWon = (value) =>
   `${value >= 0 ? "+" : "−"}₩${Math.abs(Math.round(value)).toLocaleString("ko-KR")}`;
 const shares = (value) => Number(value).toLocaleString("ko-KR", { maximumFractionDigits: 8 });
 const today = () => new Date().toISOString().slice(0, 10);
+const roundRate = (value) => Number(Number(value).toFixed(4));
 const escapeHtml = (text) =>
   String(text).replace(/[&<>"']/g, (ch) => `&#${ch.charCodeAt(0)};`);
 
 let transactions = [];
 let settings = { costMethod: COST_METHOD.FIFO, settlementDays: 2 };
 let book = { activeId: null, plans: [] };
-let todayFxRate = null;
+/** 통화별 오늘 고시환율(1통화당 원화). 조회에 실패하면 null. */
+const todayFx = new Map();
 const prices = new Map();
 
 const currentItems = () => activePlan(book).items;
+const currencyOf = (ticker) => tickerCurrency(transactions, ticker) ?? DEFAULT_CURRENCY;
 
 function heldHoldings() {
   const { holdings } = replay(transactions, settings.costMethod);
@@ -72,16 +88,17 @@ function heldHoldings() {
     .sort((a, b) => (a.ticker < b.ticker ? -1 : 1));
 }
 
-async function fetchTodayFx() {
+async function fetchTodayFx(code) {
+  if (todayFx.has(code)) return todayFx.get(code);
   try {
-    const response = await fetch(`/api/fx?date=${today()}`);
+    const response = await fetch(`/api/fx?date=${today()}&currency=${code}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
-    todayFxRate = data.rate;
-    if (!el.fx.value) el.fx.value = data.rate;
+    todayFx.set(code, data.rate);
   } catch {
-    todayFxRate = null;
+    todayFx.set(code, null);
   }
+  return todayFx.get(code);
 }
 
 async function fetchPrice(ticker) {
@@ -90,13 +107,19 @@ async function fetchPrice(ticker) {
     const response = await fetch(`/api/price?ticker=${encodeURIComponent(ticker)}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
-    const value = Math.round(data.price_usd * 100) / 100;
-    prices.set(ticker, value);
-    return value;
+    prices.set(ticker, {
+      value: Math.round((data.price ?? data.price_usd) * 100) / 100,
+      currency: data.currency ?? null,
+    });
   } catch {
     prices.set(ticker, null);
-    return null;
   }
+  return prices.get(ticker);
+}
+
+function applyFormCurrency(code) {
+  el.priceUnit.textContent = `(${code})`;
+  el.fxUnit.textContent = rateUnitLabel(code);
 }
 
 /** 종목을 고르면 보유수량·현재가·오늘 환율을 미리 채운다. 모두 고쳐 쓸 수 있다. */
@@ -105,20 +128,36 @@ async function fillDefaults() {
   const holding = heldHoldings().find((h) => h.ticker === ticker);
   if (!holding) return;
 
+  const code = currencyOf(ticker);
+  applyFormCurrency(code);
   el.quantity.value = holding.quantity;
   if (!el.date.value) el.date.value = today();
-  if (!el.fx.value && todayFxRate) el.fx.value = todayFxRate;
 
   el.formNote.textContent = `보유 ${shares(holding.quantity)}주 · 현재가 조회 중…`;
   el.formNote.className = "hint";
-  const price = await fetchPrice(ticker);
+  const [quote, rate] = await Promise.all([fetchPrice(ticker), fetchTodayFx(code)]);
   if (el.ticker.value !== ticker) return;
-  if (price === null) {
-    el.formNote.textContent = `보유 ${shares(holding.quantity)}주 · 현재가를 가져오지 못했습니다. 목표가를 직접 입력하세요.`;
+
+  // 다른 통화 종목으로 바꿨으면 그 통화의 오늘 환율로 갈아끼운다.
+  if (el.fx.dataset.currency !== code || !el.fx.value) {
+    el.fx.value = rate ? roundRate(displayRate(rate, code)) : "";
+    el.fx.dataset.currency = code;
+  }
+
+  const held = `보유 ${shares(holding.quantity)}주`;
+  if (!quote) {
+    el.formNote.textContent = `${held} · 현재가를 가져오지 못했습니다. 목표가를 직접 입력하세요.`;
+    el.formNote.className = "hint is-warning";
+  } else if (quote.currency && quote.currency !== code) {
+    el.formNote.textContent = `${held} · 시세가 ${quote.currency} 기준이라 ${code} 거래와 맞지 않습니다. 티커와 통화를 확인하고 목표가를 직접 입력하세요.`;
     el.formNote.className = "hint is-warning";
   } else {
-    el.price.value = price;
-    el.formNote.textContent = `보유 ${shares(holding.quantity)}주 · 목표가는 현재가 $${price}로 채웠습니다.`;
+    el.price.value = quote.value;
+    el.formNote.textContent = `${held} · 목표가는 현재가 ${formatMoney(quote.value, code)}로 채웠습니다.`;
+  }
+  if (!rate) {
+    el.formNote.textContent += ` 오늘 ${rateUnitLabel(code)} 환율을 가져오지 못해 직접 입력해야 합니다.`;
+    el.formNote.className = "hint is-warning";
   }
 }
 
@@ -156,6 +195,7 @@ function renderForm() {
 
   if (holdings.some((h) => h.ticker === previous)) {
     el.ticker.value = previous;
+    applyFormCurrency(currencyOf(previous));
   } else {
     fillDefaults();
   }
@@ -169,9 +209,10 @@ function marginalCell(result) {
 
 function rowHtml(item, result) {
   const id = escapeHtml(item.id);
+  const code = currencyOf(item.ticker);
   const field = (name, type, value) =>
     `<input class="cell-input" type="${type}" ${type === "number" ? 'step="any" min="0"' : ""}
-       value="${escapeHtml(value)}" data-plan-field="${name}" data-plan-id="${id}" />`;
+       value="${escapeHtml(value)}" data-plan-field="${name}" data-plan-id="${id}" data-plan-currency="${code}" />`;
 
   const gainClass =
     result.gainKrw === null ? "" : result.gainKrw >= 0 ? "gain-up" : "gain-down";
@@ -184,12 +225,18 @@ function rowHtml(item, result) {
       </td>
       <td class="ticker">${escapeHtml(item.ticker)}</td>
       <td class="num">${field("quantity", "number", item.quantity)}</td>
-      <td class="num">${field("targetPrice", "number", item.targetPrice)}</td>
+      <td class="num">
+        ${field("targetPrice", "number", item.targetPrice)}
+        <small class="muted plan-year">${code}</small>
+      </td>
       <td>
         ${field("saleDate", "date", item.saleDate)}
         ${result.year ? `<small class="muted plan-year">${result.year}년 세금</small>` : ""}
       </td>
-      <td class="num">${field("fxRate", "number", item.fxRate)}</td>
+      <td class="num">
+        ${field("fxRate", "number", item.fxRate ? roundRate(displayRate(item.fxRate, code)) : "")}
+        <small class="muted plan-year">${rateUnitLabel(code)}</small>
+      </td>
       <td class="num">${result.proceedsKrw === null ? "—" : won(result.proceedsKrw)}</td>
       <td class="num ${gainClass}">${result.gainKrw === null ? "—" : signedWon(result.gainKrw)}</td>
       <td class="num">${marginalCell(result)}</td>
@@ -257,12 +304,13 @@ const updateItems = (items) => commit(setActiveItems(book, items));
 
 function handleSubmit(event) {
   event.preventDefault();
+  const code = currencyOf(el.ticker.value);
   const item = createPlanItem({
     ticker: el.ticker.value,
     quantity: el.quantity.value,
     targetPrice: el.price.value,
     saleDate: el.date.value,
-    fxRate: el.fx.value,
+    fxRate: el.fx.value ? storedRate(el.fx.value, code) : 0,
   });
   updateItems([...currentItems(), item]);
 }
@@ -282,7 +330,8 @@ function handleTableChange(event) {
   const fieldName = event.target.dataset.planField;
   const id = event.target.dataset.planId;
   if (!fieldName || !id) return;
-  const value = fieldName === "saleDate" ? event.target.value : Number(event.target.value) || 0;
+  let value = fieldName === "saleDate" ? event.target.value : Number(event.target.value) || 0;
+  if (fieldName === "fxRate") value = storedRate(value, event.target.dataset.planCurrency);
   updateItems(currentItems().map((item) => (item.id === id ? { ...item, [fieldName]: value } : item)));
 }
 
@@ -352,6 +401,5 @@ export function initPlan(initialTransactions, initialSettings) {
   el.tableBody.addEventListener("change", handleTableChange);
   el.tableBody.addEventListener("click", handleTableClick);
 
-  fetchTodayFx();
   render();
 }

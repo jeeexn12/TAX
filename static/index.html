@@ -75,6 +75,12 @@
               <input id="ticker" name="ticker" placeholder="AAPL" required />
             </div>
 
+            <div class="field" data-only="priced">
+              <label class="label" for="trade-currency">거래 통화</label>
+              <select id="trade-currency"></select>
+              <p class="hint" id="currency-hint"></p>
+            </div>
+
             <div class="field" data-only="single">
               <label class="label" for="date">체결일</label>
               <input id="date" name="date" type="date" required />
@@ -93,7 +99,7 @@
               <span class="label">매수 금액 기준</span>
               <div class="segmented small">
                 <label><input type="radio" name="currency" value="KRW" checked /><span>원화</span></label>
-                <label><input type="radio" name="currency" value="USD" /><span>외화(USD)</span></label>
+                <label><input type="radio" name="currency" value="FOREIGN" /><span id="dca-foreign-label">외화(USD)</span></label>
               </div>
             </div>
 
@@ -135,12 +141,12 @@
             </div>
 
             <div class="field" data-only="trade">
-              <label class="label" for="price">단가 (USD)</label>
+              <label class="label" for="price">단가 (<span data-currency-code>USD</span>)</label>
               <input id="price" name="price" type="number" step="any" min="0" placeholder="180.50" />
             </div>
 
             <div class="field" data-only="trade">
-              <label class="label" for="fee">수수료 (USD)</label>
+              <label class="label" for="fee">수수료 (<span data-currency-code>USD</span>)</label>
               <input id="fee" name="fee" type="number" step="any" min="0" placeholder="0" />
               <p class="hint">증권사 매매수수료만. 환전·송금수수료 제외</p>
             </div>
@@ -149,7 +155,7 @@
           <div class="field fx-field" data-only="trade">
             <div class="fx-head">
               <span class="label">
-                적용환율 (USD/KRW)
+                적용환율 (<span id="fx-unit">USD/KRW</span>)
                 <em class="label-note">결제일의 고시환율 (실시간 시세 아님)</em>
               </span>
               <label class="checkbox">
@@ -182,7 +188,7 @@
                 <tr>
                   <th>체결일</th>
                   <th>결제일</th>
-                  <th class="num">종가 (USD)</th>
+                  <th class="num">종가 (<span data-currency-code>USD</span>)</th>
                   <th class="num">적용환율</th>
                   <th class="num">수량</th>
                   <th class="num">취득가액</th>
@@ -212,8 +218,8 @@
                   <th>종류</th>
                   <th>티커</th>
                   <th class="num">수량</th>
-                  <th class="num">단가(USD)</th>
-                  <th class="num">수수료(USD)</th>
+                  <th class="num">단가</th>
+                  <th class="num">수수료</th>
                   <th class="num">적용환율</th>
                   <th></th>
                 </tr>
@@ -228,18 +234,11 @@
       <section class="panel" data-panel="holdings">
         <div class="card summary">
           <div class="summary-item">
-            <div class="summary-head">
-              <span class="label">
-                오늘 참고환율
-                <em class="label-note">평가·시뮬레이션용 · 확정 신고환율 아님</em>
-              </span>
-              <label class="checkbox">
-                <input type="checkbox" id="today-fx-manual" />
-                <span>직접 입력</span>
-              </label>
-            </div>
-            <input id="today-fx" type="number" step="any" min="0" disabled />
-            <p class="hint" id="today-fx-note">조회 중…</p>
+            <span class="label">
+              오늘 참고환율
+              <em class="label-note">평가·시뮬레이션용 · 확정 신고환율 아님</em>
+            </span>
+            <div class="today-fx-list" id="today-fx-list"></div>
           </div>
         </div>
 
@@ -256,7 +255,7 @@
                   <th class="num">보유수량</th>
                   <th class="num" id="avg-cost-header">이동평균단가</th>
                   <th class="num">취득가액</th>
-                  <th class="num">적용 시세 (USD)</th>
+                  <th class="num">적용 시세</th>
                   <th class="num">평가금액</th>
                   <th class="num">평가손익</th>
                   <th class="center">중소기업</th>
@@ -338,7 +337,7 @@
               <input id="plan-quantity" type="number" step="any" min="0" />
             </label>
             <label class="field">
-              <span class="label">목표가 (USD)</span>
+              <span class="label">목표가 <span id="plan-price-unit">(USD)</span></span>
               <input id="plan-price" type="number" step="any" min="0" />
             </label>
             <label class="field">
@@ -346,7 +345,7 @@
               <input id="plan-date" type="date" />
             </label>
             <label class="field">
-              <span class="label">환율 가정 <em class="label-note">USD/KRW</em></span>
+              <span class="label">환율 가정 <em class="label-note" id="plan-fx-unit">USD/KRW</em></span>
               <input id="plan-fx" type="number" step="any" min="0" />
             </label>
           </div>
@@ -368,7 +367,7 @@
                   <th class="center">포함</th>
                   <th>종목</th>
                   <th class="num">수량</th>
-                  <th class="num">목표가 (USD)</th>
+                  <th class="num">목표가</th>
                   <th>매도일</th>
                   <th class="num">환율</th>
                   <th class="num">매도대금</th>
