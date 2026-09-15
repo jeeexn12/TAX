@@ -1214,3 +1214,8 @@ td.center {
   font-size: 0.85rem;
   color: var(--muted);
 }
+
+/* 요건 표에서 "1% 이상"이 "1% 이 / 상"처럼 단어 중간에서 끊기지 않게 한다 */
+.law-table td {
+  word-break: keep-all;
+}
