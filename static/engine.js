@@ -10,7 +10,16 @@
 
 export const BASIC_DEDUCTION_KRW = 2_500_000;
 export const INCOME_TAX_RATE = 0.2;
+/** 중소기업 주식 세율. 외국법인도 중소기업이면 적용된다(소득세법 제104조 제1항 제12호 가목). */
+export const SME_INCOME_TAX_RATE = 0.1;
 export const LOCAL_TAX_RATE = 0.1;
+
+/**
+ * 세율은 백분율 정수로 계산한다. 0.2 같은 소수는 2진수로 정확히 표현되지 않아
+ * 곱한 뒤 끝수를 버리면 10원이 통째로 날아가는 경우가 생긴다.
+ */
+const STANDARD_RATE_PERCENT = 20;
+const SME_RATE_PERCENT = 10;
 
 const QTY_EPSILON = 1e-9;
 
@@ -235,28 +244,162 @@ export function canAddTransaction(transactions, candidate, method = COST_METHOD.
   }
 }
 
+/** 결제일, 체결일 순. 기본공제는 먼저 양도한 자산부터 빼기 때문에 순서가 세액을 바꾼다. */
+function byTransferOrder(left, right) {
+  if (left.date !== right.date) return left.date < right.date ? -1 : 1;
+  if (left.tradeDate !== right.tradeDate) return left.tradeDate < right.tradeDate ? -1 : 1;
+  return left.order - right.order;
+}
+
 /**
- * 연간 손익통산 결과에 기본공제와 세율을 적용한다.
+ * 세율이 다른 물량을 함께 통산해 세액을 계산한다.
  *
- * 손실은 당해연도 내 통산만 가능하고 이월되지 않으므로, 통산 결과가 음수면
- * 과세표준은 0이 된다.
+ * items: { ratePercent, gainKrw, date, tradeDate }. 순서는 다음과 같다.
+ *
+ * 1. 양도차손은 같은 세율 자산의 이익에서 먼저 빼고, 남으면 다른 세율 자산에서
+ *    뺀다. 다른 세율이 둘 이상이면 세율별 소득금액 비율로 나눈다.
+ *    (소득세법 제102조 제2항, 시행령 제167조의2 제1항)
+ *    같은 세율 안에서 이익 자산이 여럿일 때 어느 자산에서 먼저 뺄지는 조문에 없어서,
+ *    각 자산 이익 비율대로 나눈다.
+ * 2. 기본공제 250만원은 먼저 양도한 자산의 소득금액부터 순서대로 뺀다.
+ *    (소득세법 제103조 제2항)
+ * 3. 세율별 과세표준에 세율을 곱해 합하고, 지방소득세는 소득세의 10%다.
+ *
+ * 세율이 하나뿐이면 합계에서 기본공제를 빼고 세율을 곱하는 계산과 같다.
  */
-export function calculateTax(totalGainKrw) {
-  // 국고금 관리법 제47조: 과세표준은 1원 미만, 세액은 10원 미만 끝수를 버린다.
-  const gain = Math.trunc(totalGainKrw);
-  const deduction = gain > 0 ? Math.min(BASIC_DEDUCTION_KRW, gain) : 0;
-  const taxableBase = Math.max(0, gain - deduction);
-  const incomeTax = floorToTen(taxableBase * INCOME_TAX_RATE);
-  const localTax = floorToTen(incomeTax * LOCAL_TAX_RATE);
+export function calculateTaxByRate(items) {
+  const entries = items.map((item, order) => ({
+    ...item,
+    order,
+    amount: Math.max(0, item.gainKrw),
+  }));
+  const rates = [...new Set(entries.map((e) => e.ratePercent))].sort((a, b) => b - a);
+  const gainsOf = (rate) => entries.filter((e) => e.ratePercent === rate && e.amount > 0);
+  const remainingOf = (rate) => gainsOf(rate).reduce((sum, e) => sum + e.amount, 0);
+
+  /** 같은 세율 안의 이익 자산들에서 손실을 이익 비율대로 뺀다. 뺀 금액을 돌려준다. */
+  function offsetProRata(rate, loss) {
+    const total = remainingOf(rate);
+    if (total <= 0 || loss <= 0) return 0;
+    const offset = Math.min(loss, total);
+    const keep = 1 - offset / total;
+    gainsOf(rate).forEach((e) => (e.amount *= keep));
+    return offset;
+  }
+
+  // 1단계: 같은 세율끼리 통산
+  const leftoverLoss = new Map();
+  for (const rate of rates) {
+    const loss = entries
+      .filter((e) => e.ratePercent === rate && e.gainKrw < 0)
+      .reduce((sum, e) => sum - e.gainKrw, 0);
+    leftoverLoss.set(rate, loss - offsetProRata(rate, loss));
+  }
+
+  // 2단계: 남은 손실을 다른 세율 자산의 소득금액 비율로 나눠 뺀다
+  for (const rate of rates) {
+    const loss = leftoverLoss.get(rate);
+    if (!(loss > 0)) continue;
+    const others = rates.filter((r) => r !== rate).map((r) => [r, remainingOf(r)]);
+    const othersTotal = others.reduce((sum, [, remaining]) => sum + remaining, 0);
+    if (othersTotal <= 0) continue;
+    const spread = Math.min(loss, othersTotal);
+    for (const [other, remaining] of others) {
+      offsetProRata(other, spread * (remaining / othersTotal));
+    }
+  }
+
+  const buckets = new Map(
+    rates.map((rate) => [
+      rate,
+      {
+        ratePercent: rate,
+        gainKrw: Math.trunc(
+          entries.filter((e) => e.ratePercent === rate).reduce((sum, e) => sum + e.gainKrw, 0)
+        ),
+        incomeKrw: Math.trunc(remainingOf(rate)),
+        deductionKrw: 0,
+      },
+    ])
+  );
+
+  // 3단계: 기본공제를 먼저 양도한 자산부터 뺀다. 자산별 금액은 소수라 올림해서
+  // 한도로 쓰고, 실제로 빼는 금액은 세율별 소득금액(1원 절사)을 넘지 않게 한다.
+  let deductionLeft = BASIC_DEDUCTION_KRW;
+  for (const entry of entries.filter((e) => e.amount > 0).sort(byTransferOrder)) {
+    if (deductionLeft <= 0) break;
+    const bucket = buckets.get(entry.ratePercent);
+    const take = Math.min(
+      deductionLeft,
+      Math.ceil(entry.amount),
+      bucket.incomeKrw - bucket.deductionKrw
+    );
+    if (take <= 0) continue;
+    bucket.deductionKrw += take;
+    deductionLeft -= take;
+  }
+
+  const byRate = [...buckets.values()].map((bucket) => {
+    const taxableBase = bucket.incomeKrw - bucket.deductionKrw;
+    return {
+      ...bucket,
+      taxableBaseKrw: taxableBase,
+      incomeTaxKrw: Math.floor((taxableBase * bucket.ratePercent) / 1000) * 10,
+    };
+  });
+
+  const sum = (key) => byRate.reduce((total, bucket) => total + bucket[key], 0);
+  const incomeTax = sum("incomeTaxKrw");
+  const localTax = Math.floor(incomeTax / 100) * 10;
 
   return {
-    totalGainKrw: gain,
-    deductionKrw: deduction,
-    taxableBaseKrw: taxableBase,
+    totalGainKrw: Math.trunc(entries.reduce((total, e) => total + e.gainKrw, 0)),
+    deductionKrw: sum("deductionKrw"),
+    taxableBaseKrw: sum("taxableBaseKrw"),
     incomeTaxKrw: incomeTax,
     localTaxKrw: localTax,
     totalTaxKrw: incomeTax + localTax,
+    byRate,
   };
+}
+
+/**
+ * 연간 손익통산 결과에 기본공제와 세율을 적용한다. 모두 20% 물량일 때의 계산.
+ *
+ * 손실은 당해연도 내 통산만 가능하고 이월되지 않으므로, 통산 결과가 음수면
+ * 과세표준은 0이 된다. 국고금 관리법 제47조에 따라 과세표준은 1원 미만,
+ * 세액은 10원 미만 끝수를 버린다.
+ */
+export function calculateTax(totalGainKrw) {
+  return calculateTaxByRate([
+    { ratePercent: STANDARD_RATE_PERCENT, gainKrw: Math.trunc(totalGainKrw), date: "", tradeDate: "" },
+  ]);
+}
+
+/**
+ * 매도 건과 국내주식 손익을 세율별 계산 항목으로 바꾼다.
+ *
+ * 중소기업 여부는 도구가 판단하지 않고 사용자가 종목별로 표시한 목록을 쓴다.
+ * 국내주식 손익은 날짜 없이 연간 합계만 받으므로 20% 물량으로 보고, 양도 순서는
+ * 그 해 해외주식 매도보다 뒤로 둔다.
+ */
+function taxItems(yearSales, domesticGainKrw, smeTickers) {
+  const sme = new Set(smeTickers);
+  const items = yearSales.map((sale) => ({
+    ratePercent: sme.has(sale.ticker) ? SME_RATE_PERCENT : STANDARD_RATE_PERCENT,
+    gainKrw: sale.gainKrw,
+    date: sale.date,
+    tradeDate: sale.tradeDate,
+  }));
+  if (domesticGainKrw) {
+    items.push({
+      ratePercent: STANDARD_RATE_PERCENT,
+      gainKrw: domesticGainKrw,
+      date: "9999-12-31",
+      tradeDate: "9999-12-31",
+    });
+  }
+  return items;
 }
 
 /**
@@ -268,7 +411,13 @@ export function calculateTax(totalGainKrw) {
  * 기본공제는 매도 건마다 차감되는 게 아니라, 그 해 매도를 전부 합산한
  * 뒤(손익통산) 연 1회만 적용된다.
  */
-export function annualSummary(transactions, year, method = COST_METHOD.FIFO, domesticGainKrw = 0) {
+export function annualSummary(
+  transactions,
+  year,
+  method = COST_METHOD.FIFO,
+  domesticGainKrw = 0,
+  smeTickers = []
+) {
   const { holdings, sales } = replay(transactions, method);
   const yearSales = sales.filter((s) => s.date.slice(0, 4) === String(year));
   const overseasGain = yearSales.reduce((sum, s) => sum + s.gainKrw, 0);
@@ -277,16 +426,16 @@ export function annualSummary(transactions, year, method = COST_METHOD.FIFO, dom
     yearSales,
     overseasGainKrw: overseasGain,
     domesticGainKrw,
-    tax: calculateTax(overseasGain + domesticGainKrw),
+    tax: calculateTaxByRate(taxItems(yearSales, domesticGainKrw, smeTickers)),
   };
 }
 
 /**
  * 같은 거래 기록을 선입선출법과 이동평균법으로 각각 계산해 나란히 돌려준다.
  */
-export function compareMethods(transactions, year, domesticGainKrw = 0) {
-  const fifo = annualSummary(transactions, year, COST_METHOD.FIFO, domesticGainKrw);
-  const average = annualSummary(transactions, year, COST_METHOD.AVERAGE, domesticGainKrw);
+export function compareMethods(transactions, year, domesticGainKrw = 0, smeTickers = []) {
+  const fifo = annualSummary(transactions, year, COST_METHOD.FIFO, domesticGainKrw, smeTickers);
+  const average = annualSummary(transactions, year, COST_METHOD.AVERAGE, domesticGainKrw, smeTickers);
   const differenceKrw = fifo.tax.totalTaxKrw - average.tax.totalTaxKrw;
 
   return {
@@ -307,19 +456,20 @@ export const TAX_FREE_HEADROOM_LABEL = "올해 세금 없이 추가로 실현 �
  *
  * "남은 기본공제"라고 부르면 250만원이 상한인 것처럼 읽히지만, 이미 손실을
  * 실현해 둔 해에는 그 손실만큼 이익을 더 얹어도 통산되어 세금이 없다.
- * 그래서 상한이 아니라 실제 여유분을 계산한다.
+ * 그래서 상한이 아니라 실제 여유분을 계산한다. 손실은 세율이 달라도 끝까지
+ * 통산되므로 세율이 섞여도 여유분은 같다.
  */
-export function taxFreeHeadroomKrw(transactions, year, method = COST_METHOD.FIFO, domesticGainKrw = 0) {
-  const { tax } = annualSummary(transactions, year, method, domesticGainKrw);
+export function taxFreeHeadroomKrw(
+  transactions,
+  year,
+  method = COST_METHOD.FIFO,
+  domesticGainKrw = 0,
+  smeTickers = []
+) {
+  const { tax } = annualSummary(transactions, year, method, domesticGainKrw, smeTickers);
   return Math.max(0, BASIC_DEDUCTION_KRW - tax.totalGainKrw);
 }
 
-/**
- * 가상 매도를 추가했을 때 늘어나는 세액을 계산한다.
- *
- * 확정 거래만으로 계산한 세액과, 가상 매도를 포함해 계산한 세액의 차액이
- * '지금 팔면 추가로 내야 하는 세금'이다.
- */
 /**
  * 목표가 시뮬레이션에서 환율 가정을 바꿔가며 세액이 어떻게 달라지는지 계산한다.
  *
@@ -327,7 +477,12 @@ export function taxFreeHeadroomKrw(transactions, year, method = COST_METHOD.FIFO
  * 환율만 가정값으로 바꾼다. 환율이 오르면 원화 양도가액이 커져서 세금도
  * 함께 늘어난다.
  */
-export function fxSensitivity(transactions, virtualSales, year, { from, to, step, method } = {}) {
+export function fxSensitivity(
+  transactions,
+  virtualSales,
+  year,
+  { from, to, step, method, domesticGainKrw, smeTickers } = {}
+) {
   const start = from ?? 1250;
   const end = to ?? 1500;
   const increment = step ?? 50;
@@ -341,7 +496,14 @@ export function fxSensitivity(transactions, virtualSales, year, { from, to, step
     // 누적 덧셈은 오차가 쌓이므로 매번 시작값에서 계산한다.
     const rate = start + i * increment;
     const atRate = virtualSales.map((sale) => ({ ...sale, fx_rate: rate }));
-    const result = simulate(transactions, atRate, year, method ?? COST_METHOD.FIFO);
+    const result = simulate(
+      transactions,
+      atRate,
+      year,
+      method ?? COST_METHOD.FIFO,
+      domesticGainKrw ?? 0,
+      smeTickers ?? []
+    );
     rows.push({
       fxRate: rate,
       simulatedGainKrw: result.simulatedGainKrw,
@@ -354,9 +516,28 @@ export function fxSensitivity(transactions, virtualSales, year, { from, to, step
   return rows;
 }
 
-export function simulate(transactions, virtualSales, year, method = COST_METHOD.FIFO, domesticGainKrw = 0) {
-  const before = annualSummary(transactions, year, method, domesticGainKrw).tax;
-  const withVirtual = annualSummary([...transactions, ...virtualSales], year, method, domesticGainKrw);
+/**
+ * 가상 매도를 추가했을 때 늘어나는 세액을 계산한다.
+ *
+ * 확정 거래만으로 계산한 세액과, 가상 매도를 포함해 계산한 세액의 차액이
+ * '지금 팔면 추가로 내야 하는 세금'이다.
+ */
+export function simulate(
+  transactions,
+  virtualSales,
+  year,
+  method = COST_METHOD.FIFO,
+  domesticGainKrw = 0,
+  smeTickers = []
+) {
+  const before = annualSummary(transactions, year, method, domesticGainKrw, smeTickers).tax;
+  const withVirtual = annualSummary(
+    [...transactions, ...virtualSales],
+    year,
+    method,
+    domesticGainKrw,
+    smeTickers
+  );
   const after = withVirtual.tax;
 
   const virtualIds = new Set(virtualSales.map((v) => v.id));
