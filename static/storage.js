@@ -79,7 +79,7 @@ export function validateTransactions(raw) {
     const where = `${index + 1}번째 거래`;
 
     if (tx.type !== "buy" && tx.type !== "sell" && tx.type !== "split") {
-      throw new StorageError(`${where}: 거래 구분이 매수/매도/주식분할이 아닙니다.`);
+      throw new StorageError(`${where}: 거래 구분이 매수/매도/수량 변동이 아닙니다.`);
     }
     if (typeof tx.ticker !== "string" || !tx.ticker.trim()) {
       throw new StorageError(`${where}: 종목 티커가 비어 있습니다.`);
@@ -95,15 +95,21 @@ export function validateTransactions(raw) {
     }
 
     if (tx.type === "split") {
-      if (!(Number(tx.ratio) > 0)) {
-        throw new StorageError(`${where}: 분할비율이 올바르지 않습니다. (예: 1주가 4주가 되면 4)`);
+      const added = Number(tx.added_quantity ?? 0);
+      if (!(added > 0) && !(Number(tx.ratio) > 0)) {
+        throw new StorageError(`${where}: 수량 변동의 변동 후 수량이 올바르지 않습니다.`);
       }
+      const optionalNumber = (value) => (value == null ? null : Number(value));
       return {
         id: typeof tx.id === "string" && tx.id ? tx.id : newId(),
         type: "split",
         ticker: tx.ticker.trim().toUpperCase(),
         date: tx.date,
-        ratio: Number(tx.ratio),
+        ratio: added > 0 ? null : Number(tx.ratio),
+        added_quantity: added > 0 ? added : 0,
+        cost_krw: added > 0 ? Math.max(0, Number(tx.cost_krw) || 0) : 0,
+        quantity_before: optionalNumber(tx.quantity_before),
+        quantity_after: optionalNumber(tx.quantity_after),
       };
     }
 

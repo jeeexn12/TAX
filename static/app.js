@@ -1,4 +1,10 @@
-import { EngineError, canAddTransaction, replay, sellableInfo } from "./engine.js";
+import {
+  EngineError,
+  buildQuantityChange,
+  canAddTransaction,
+  replay,
+  sellableInfo,
+} from "./engine.js";
 import {
   DCA_DISCLAIMER,
   buildLots,
@@ -28,7 +34,7 @@ import {
   updateTransaction,
 } from "./storage.js";
 
-const TYPE_LABELS = { buy: "매수", sell: "매도", split: "주식분할" };
+const TYPE_LABELS = { buy: "매수", sell: "매도", split: "수량 변동" };
 
 /** 입력을 막되 별도 오류문구는 띄우지 않는 경우(위 안내문이 이미 사유를 설명할 때). */
 const BLOCKED_SILENTLY = Symbol("blocked");
@@ -46,7 +52,9 @@ const el = {
   settingsSummary: document.getElementById("settings-summary"),
   settlementDays: document.getElementById("settlement-days"),
   methodWarning: document.getElementById("method-warning"),
-  ratio: document.getElementById("ratio"),
+  quantityAfter: document.getElementById("quantity-after"),
+  adjustAmount: document.getElementById("adjust-amount"),
+  adjustNote: document.getElementById("adjust-note"),
   quantity: document.getElementById("quantity"),
   price: document.getElementById("price"),
   fee: document.getElementById("fee"),
@@ -117,6 +125,15 @@ function syncCurrencyWithTicker() {
     : "미국 외 주식은 7203.T(도쿄), 0700.HK(홍콩)처럼 거래소 표시를 붙여 입력하세요.";
 }
 
+/** "100주→400주"처럼 수량 변동을 짧게 적는다. 비율만 있던 예전 기록은 배수로 적는다. */
+function quantityChangeText(tx) {
+  if (tx.quantity_before != null && tx.quantity_after != null) {
+    return `${number(tx.quantity_before, 8)}주→${number(tx.quantity_after, 8)}주`;
+  }
+  if (Number(tx.added_quantity) > 0) return `+${number(tx.added_quantity, 8)}주`;
+  return `${number(tx.ratio, 4)}배`;
+}
+
 function dateKr(iso) {
   const [, m, d] = iso.split("-");
   return `${Number(m)}월 ${Number(d)}일`;
@@ -148,8 +165,9 @@ function applyTypeVisibility() {
   show('[data-only="dca"]', type === "dca");
   show('[data-only="priced"]', type !== "split");
 
+  document.querySelector('label[for="date"]').textContent = type === "split" ? "변동일" : "체결일";
   el.submit.textContent =
-    type === "dca" ? "미리보기 만들기" : type === "split" ? "주식분할 추가" : "거래 추가";
+    type === "dca" ? "미리보기 만들기" : type === "split" ? "수량 변동 추가" : "거래 추가";
 
   if (type !== "dca") hidePreview();
 }
@@ -247,7 +265,7 @@ function updateSellNotice(info) {
   const limit = info.limitedBy;
   const reason = limit
     ? ` ${limit.date} ${TYPE_LABELS[limit.type]} ${
-        limit.type === "split" ? `${number(limit.ratio, 4)}배` : `${number(limit.quantity, 8)}주`
+        limit.type === "split" ? quantityChangeText(limit) : `${number(limit.quantity, 8)}주`
       } 때문에 제한됩니다.`
     : "";
 
@@ -261,11 +279,54 @@ function updateSellNotice(info) {
   el.sellNotice.hidden = false;
 }
 
+/** 수량 변동 입력을 거래 값으로 바꾼다. 변동 전 수량은 변동일 기준 기록상 보유수량이다. */
+function quantityChangeDraft() {
+  const ticker = el.ticker.value.trim().toUpperCase();
+  const heldBefore =
+    ticker && el.date.value ? sellableInfo(transactions, ticker, el.date.value).heldAtDate : 0;
+  return {
+    heldBefore,
+    ...buildQuantityChange({
+      heldBefore,
+      quantityAfter: el.quantityAfter.value,
+      costKrw: el.adjustAmount.value,
+    }),
+  };
+}
+
+/** 변동일 기준 기록상 보유수량과, 입력대로 저장하면 어떻게 계산되는지 알려준다. */
+function updateAdjustNote() {
+  if (selectedType() !== "split") return;
+  const ticker = el.ticker.value.trim().toUpperCase();
+  if (!ticker || !el.date.value) {
+    el.adjustNote.textContent = "티커와 변동일을 넣으면 그날 기록상 보유수량을 보여줍니다.";
+    return;
+  }
+
+  const change = quantityChangeDraft();
+  const held = `${el.date.value} 기준 기록상 보유 ${number(change.heldBefore, 8)}주`;
+  if (!el.quantityAfter.value || change.error) {
+    el.adjustNote.textContent = `${held}. 증권사 취득내역의 변동 후 수량과 비교해보세요.`;
+    return;
+  }
+
+  const f = change.fields;
+  el.adjustNote.textContent =
+    f.added_quantity > 0
+      ? `${held} → ${number(f.quantity_after, 8)}주. 늘어난 ${number(f.added_quantity, 8)}주를 ${won(
+          f.cost_krw
+        )}짜리 새 로트로 넣습니다.`
+      : `${held} → ${number(f.quantity_after, 8)}주. 기존 로트를 ${number(
+          f.ratio,
+          6
+        )}배로 나누고 취득가액 총액은 그대로 둡니다.`;
+}
+
 function buildTransaction() {
   const type = selectedType();
   const base = { type, ticker: el.ticker.value.trim().toUpperCase(), date: el.date.value };
 
-  if (type === "split") return { ...base, ratio: Number(el.ratio.value) };
+  if (type === "split") return { ...base, ...(quantityChangeDraft().fields ?? { ratio: 0 }) };
 
   return {
     ...base,
@@ -306,8 +367,11 @@ function findError() {
   if (!el.date.value) return "체결일을 입력해주세요.";
 
   if (type === "split") {
-    if (!(Number(el.ratio.value) > 0)) return "분할비율은 0보다 커야 합니다.";
-    return null;
+    const change = quantityChangeDraft();
+    if (change.error) return change.error;
+    // 병합으로 수량이 줄면 그 뒤에 입력해둔 매도가 성립하지 않을 수 있다.
+    const check = canAddTransaction(transactions, buildTransaction(), settings.costMethod);
+    return check.ok ? null : check.error;
   }
 
   if (!el.settlementDate.value) return "결제일을 입력해주세요.";
@@ -327,12 +391,13 @@ function findError() {
 function validate() {
   const type = selectedType();
   updateSellNotice(describeSellable());
+  updateAdjustNote();
 
   const hasEnoughInput =
     el.ticker.value.trim() &&
     (type === "dca"
       ? el.dcaAmount.value && el.dcaStart.value && el.dcaEnd.value
-      : el.date.value && (type === "split" ? el.ratio.value : el.quantity.value));
+      : el.date.value && (type === "split" ? el.quantityAfter.value : el.quantity.value));
 
   const error = findError();
   const blocked = Boolean(error);
@@ -521,8 +586,8 @@ function readRow(tx) {
     </td>
     <td><span class="pill pill-${tx.type}">${TYPE_LABELS[tx.type]}</span>${badge}</td>
     <td class="ticker">${tx.ticker}</td>
-    <td class="num">${isSplit ? `${number(tx.ratio, 4)}배` : number(tx.quantity, 8)}</td>
-    <td class="num">${isSplit ? "—" : `${number(tx.price_usd, 4)} <small class="muted">${code}</small>`}</td>
+    <td class="num">${isSplit ? quantityChangeText(tx) : number(tx.quantity, 8)}</td>
+    <td class="num">${isSplit ? (Number(tx.cost_krw) > 0 ? won(tx.cost_krw) : "—") : `${number(tx.price_usd, 4)} <small class="muted">${code}</small>`}</td>
     <td class="num">${isSplit ? "—" : number(tx.fee_usd, 4)}</td>
     <td class="num">${
       isSplit
@@ -643,7 +708,8 @@ function handleSubmit(event) {
   el.quantity.value = "";
   el.price.value = "";
   el.fee.value = "";
-  el.ratio.value = "";
+  el.quantityAfter.value = "";
+  el.adjustAmount.value = "";
 
   renderTable();
   refreshHoldings(transactions, settings.costMethod);
@@ -771,7 +837,16 @@ function init() {
 
   el.ticker.addEventListener("input", syncCurrencyWithTicker);
 
-  [el.ticker, el.quantity, el.price, el.fee, el.ratio, el.fxRate, el.dcaAmount].forEach((input) =>
+  [
+    el.ticker,
+    el.quantity,
+    el.price,
+    el.fee,
+    el.quantityAfter,
+    el.adjustAmount,
+    el.fxRate,
+    el.dcaAmount,
+  ].forEach((input) =>
     input.addEventListener("input", validate)
   );
 

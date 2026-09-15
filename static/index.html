@@ -64,7 +64,7 @@
             <div class="segmented" id="type-picker">
               <label><input type="radio" name="type" value="buy" checked /><span>매수</span></label>
               <label><input type="radio" name="type" value="sell" /><span>매도</span></label>
-              <label><input type="radio" name="type" value="split" /><span>주식분할</span></label>
+              <label><input type="radio" name="type" value="split" /><span>수량 변동</span></label>
               <label><input type="radio" name="type" value="dca" /><span>정액 반복매수</span></label>
             </div>
           </div>
@@ -130,9 +130,24 @@
             </div>
 
             <div class="field" data-only="split" hidden>
-              <label class="label" for="ratio">분할비율</label>
-              <input id="ratio" name="ratio" type="number" step="any" min="0" placeholder="4" />
-              <p class="hint">1주가 4주가 되면 <b>4</b>, 4주가 1주로 병합되면 <b>0.25</b></p>
+              <label class="label" for="quantity-after">
+                변동 후 보유수량
+                <em class="label-note">분할·병합·무상주 후 증권사 취득내역의 수량</em>
+              </label>
+              <input id="quantity-after" type="number" step="any" min="0" placeholder="400" />
+              <p class="hint" id="adjust-note">티커와 변동일을 넣으면 그날 기록상 보유수량을 보여줍니다.</p>
+            </div>
+
+            <div class="field" data-only="split" hidden>
+              <label class="label" for="adjust-amount">
+                금액 (원)
+                <em class="label-note">명세서에 금액이 있을 때만</em>
+              </label>
+              <input id="adjust-amount" type="number" step="any" min="0" placeholder="0" />
+              <p class="hint">
+                분할·병합처럼 금액이 없으면 비워두세요. 금액이 있으면 늘어난 주식을 그 금액의
+                새 로트로 넣습니다.
+              </p>
             </div>
 
             <div class="field" data-only="trade">

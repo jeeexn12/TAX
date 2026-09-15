@@ -20,7 +20,7 @@ import { loadSettings, settlementDate } from "./settings.js";
 import { loadSmeTickers, saveSmeTickers } from "./storage.js";
 import { isMixedRate, rateLabel } from "./taxview.js";
 
-const TYPE_LABELS = { buy: "매수", sell: "매도", split: "주식분할" };
+const TYPE_LABELS = { buy: "매수", sell: "매도", split: "수량 변동" };
 /** 오늘 달러 환율을 못 가져왔을 때 시뮬레이션 슬라이더를 놓을 자리. */
 const USD_FALLBACK_RATE = 1350;
 
@@ -203,9 +203,13 @@ function renderLots(holdings) {
 function limitReason(limitedBy) {
   if (!limitedBy) return "";
   const amount =
-    limitedBy.type === "split"
-      ? `${shares(limitedBy.ratio)}배`
-      : `${shares(limitedBy.quantity)}주`;
+    limitedBy.type !== "split"
+      ? `${shares(limitedBy.quantity)}주`
+      : limitedBy.quantity_after != null
+        ? `${shares(limitedBy.quantity_before)}주→${shares(limitedBy.quantity_after)}주`
+        : Number(limitedBy.added_quantity) > 0
+          ? `+${shares(limitedBy.added_quantity)}주`
+          : `${shares(limitedBy.ratio)}배`;
   return ` ${limitedBy.date} ${TYPE_LABELS[limitedBy.type]} ${amount} 때문에 제한됩니다.`;
 }
 

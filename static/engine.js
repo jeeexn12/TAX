@@ -125,12 +125,22 @@ export function replay(transactions, method = COST_METHOD.FIFO) {
     if (!holdings.has(ticker)) holdings.set(ticker, new Holding(ticker));
     const holding = holdings.get(ticker);
 
-    // 주식분할은 양도가 아니므로 취득가액 총액은 그대로 두고 수량만 늘린다.
-    // 주당 취득단가는 avgCostKrw가 매번 나눠 계산하므로 자동으로 조정된다.
+    // 수량 변동(분할·병합·무상주)은 양도가 아니다. 증권사 취득내역에 금액이 붙어 나오면
+    // 늘어난 주식을 그 금액짜리 새 로트로 넣고, 금액이 없으면 기존 로트를 같은 비율로
+    // 나눈다(취득가액 총액과 취득 순서는 그대로). 어느 쪽인지 도구가 판단하지 않고
+    // 입력된 금액 유무로만 가른다.
     if (tx.type === "split") {
+      const added = Number(tx.added_quantity ?? 0);
+      if (added > 0) {
+        const costKrw = Number(tx.cost_krw ?? 0);
+        holding.quantity += added;
+        holding.totalCostKrw += costKrw;
+        holding.lots.push({ quantity: added, costKrw, date: effectiveDate(tx) });
+        continue;
+      }
       const ratio = Number(tx.ratio);
       if (!(ratio > 0)) {
-        throw new EngineError(`${ticker} ${tx.date}: 분할비율은 0보다 커야 합니다.`);
+        throw new EngineError(`${ticker} ${tx.date}: 수량 변동의 변동 후 수량이 올바르지 않습니다.`);
       }
       holding.quantity *= ratio;
       holding.lots.forEach((lot) => (lot.quantity *= ratio));
@@ -201,7 +211,7 @@ export function sellableInfo(transactions, ticker, date) {
 
   let quantity = 0;
   for (const tx of sorted.filter((tx) => effectiveDate(tx) <= date)) {
-    if (tx.type === "split") quantity *= Number(tx.ratio);
+    if (tx.type === "split") quantity = applyQuantityChange(quantity, tx);
     else if (tx.type === "buy") quantity += Number(tx.quantity);
     else if (tx.type === "sell") quantity -= Number(tx.quantity);
   }
@@ -212,7 +222,9 @@ export function sellableInfo(transactions, ticker, date) {
   let splitFactor = 1;
 
   for (const tx of sorted.filter((tx) => effectiveDate(tx) > date)) {
-    if (tx.type === "split") {
+    if (tx.type === "split" && Number(tx.added_quantity ?? 0) > 0) {
+      quantity += Number(tx.added_quantity);
+    } else if (tx.type === "split") {
       const ratio = Number(tx.ratio);
       quantity *= ratio;
       splitFactor *= ratio;
@@ -228,6 +240,59 @@ export function sellableInfo(transactions, ticker, date) {
   }
 
   return { max: Math.max(0, limit), heldAtDate, limitedBy };
+}
+
+/** 수량 변동 한 건을 보유수량에 반영한다. 금액이 붙은 무상주는 더하고, 나머지는 비율을 곱한다. */
+function applyQuantityChange(quantity, tx) {
+  const added = Number(tx.added_quantity ?? 0);
+  return added > 0 ? quantity + added : quantity * Number(tx.ratio);
+}
+
+/**
+ * 증권사 취득내역의 "변동 후 수량"과 금액으로 수량 변동 거래의 값을 만든다.
+ *
+ * 금액이 있으면 늘어난 수량을 그 금액짜리 새 로트로, 없으면 변동 전후 비율로 기록한다.
+ * 변동 후 수량 그대로가 아니라 비율·늘어난 수량으로 저장해야, 나중에 그 이전 거래를
+ * 고치거나 추가해도 분할 배수가 틀어지지 않는다.
+ */
+export function buildQuantityChange({ heldBefore, quantityAfter, costKrw = 0 }) {
+  const before = Number(heldBefore);
+  const after = Number(quantityAfter);
+  const cost = Number(costKrw) || 0;
+
+  if (!(before > QTY_EPSILON)) {
+    return { error: "변동일 기준 기록상 보유수량이 없습니다. 이전 매수를 먼저 입력해주세요." };
+  }
+  if (!(after > 0)) return { error: "변동 후 보유수량을 입력해주세요." };
+  if (cost < 0) return { error: "금액은 0 이상이어야 합니다." };
+
+  if (cost > 0) {
+    if (!(after > before + QTY_EPSILON)) {
+      return { error: "금액이 있는 수량 변동은 수량이 늘어난 경우만 입력할 수 있습니다." };
+    }
+    return {
+      fields: {
+        quantity_before: before,
+        quantity_after: after,
+        added_quantity: after - before,
+        cost_krw: cost,
+        ratio: null,
+      },
+    };
+  }
+
+  if (Math.abs(after - before) <= QTY_EPSILON) {
+    return { error: "변동 전과 수량이 같습니다. 증권사 취득내역의 변동 후 수량을 확인해주세요." };
+  }
+  return {
+    fields: {
+      quantity_before: before,
+      quantity_after: after,
+      added_quantity: 0,
+      cost_krw: 0,
+      ratio: after / before,
+    },
+  };
 }
 
 export function maxSellableQuantity(transactions, ticker, date) {
