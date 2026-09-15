@@ -43,17 +43,109 @@ export function normalizePlan(raw) {
     }));
 }
 
-export function loadPlan() {
+/**
+ * 이름 붙인 계획 여러 개를 담는 묶음. 복사해서 조금씩 바꿔가며 비교할 수 있게 한다.
+ * { activeId, plans: [{ id, name, items }] }
+ */
+const PLAN_BOOK_KEY = "us-tax:sale-plans";
+const PLAN_NAME_MAX = 30;
+
+function cleanName(name) {
+  return typeof name === "string" ? name.trim().slice(0, PLAN_NAME_MAX) : "";
+}
+
+/** 아직 쓰지 않은 "매도계획 N" 이름. */
+export function nextPlanName(plans) {
+  const names = new Set(plans.map((plan) => plan.name));
+  let n = plans.length + 1;
+  while (names.has(`매도계획 ${n}`)) n += 1;
+  return `매도계획 ${n}`;
+}
+
+export function normalizePlanBook(raw) {
+  const plans = [];
+  const seen = new Set();
+  for (const plan of Array.isArray(raw?.plans) ? raw.plans : []) {
+    if (!plan || typeof plan !== "object") continue;
+    const id = typeof plan.id === "string" && plan.id && !seen.has(plan.id) ? plan.id : newId();
+    seen.add(id);
+    plans.push({
+      id,
+      name: cleanName(plan.name) || nextPlanName(plans),
+      items: normalizePlan(plan.items),
+    });
+  }
+  // 계획이 하나도 없으면 빈 계획 하나를 둔다. 화면이 늘 어떤 계획을 보고 있게 하기 위해서다.
+  if (!plans.length) plans.push({ id: newId(), name: nextPlanName(plans), items: [] });
+
+  const activeId = plans.some((plan) => plan.id === raw?.activeId) ? raw.activeId : plans[0].id;
+  return { activeId, plans };
+}
+
+export function activePlan(book) {
+  return book.plans.find((plan) => plan.id === book.activeId) ?? book.plans[0];
+}
+
+export function addPlan(book) {
+  const plan = { id: newId(), name: nextPlanName(book.plans), items: [] };
+  return { activeId: plan.id, plans: [...book.plans, plan] };
+}
+
+export function duplicatePlan(book, id) {
+  const source = book.plans.find((plan) => plan.id === id);
+  if (!source) return book;
+  const copy = {
+    id: newId(),
+    name: cleanName(`${source.name} 복사본`),
+    items: source.items.map((item) => ({ ...item, id: newId() })),
+  };
+  const plans = [...book.plans];
+  plans.splice(plans.indexOf(source) + 1, 0, copy);
+  return { activeId: copy.id, plans };
+}
+
+/** 빈 이름으로는 바꾸지 않는다. */
+export function renamePlan(book, id, name) {
+  const cleaned = cleanName(name);
+  if (!cleaned) return book;
+  return { ...book, plans: book.plans.map((plan) => (plan.id === id ? { ...plan, name: cleaned } : plan)) };
+}
+
+export function removePlan(book, id) {
+  const plans = book.plans.filter((plan) => plan.id !== id);
+  return normalizePlanBook({
+    activeId: book.activeId === id ? plans[0]?.id : book.activeId,
+    plans,
+  });
+}
+
+export function setActivePlan(book, id) {
+  return book.plans.some((plan) => plan.id === id) ? { ...book, activeId: id } : book;
+}
+
+export function setActiveItems(book, items) {
+  return {
+    ...book,
+    plans: book.plans.map((plan) => (plan.id === book.activeId ? { ...plan, items } : plan)),
+  };
+}
+
+export function loadPlanBook() {
   try {
-    return normalizePlan(JSON.parse(localStorage.getItem(PLAN_KEY) ?? "[]"));
+    const saved = localStorage.getItem(PLAN_BOOK_KEY);
+    if (saved) return normalizePlanBook(JSON.parse(saved));
+    // 계획을 하나만 두던 때 저장한 목록은 "매도계획 1"로 옮긴다.
+    const legacy = normalizePlan(JSON.parse(localStorage.getItem(PLAN_KEY) ?? "[]"));
+    return normalizePlanBook({ plans: [{ name: "매도계획 1", items: legacy }] });
   } catch {
-    return [];
+    return normalizePlanBook(null);
   }
 }
 
-export function savePlan(plan) {
-  const normalized = normalizePlan(plan);
-  localStorage.setItem(PLAN_KEY, JSON.stringify(normalized));
+export function savePlanBook(book) {
+  const normalized = normalizePlanBook(book);
+  localStorage.setItem(PLAN_BOOK_KEY, JSON.stringify(normalized));
+  localStorage.removeItem(PLAN_KEY);
   return normalized;
 }
 

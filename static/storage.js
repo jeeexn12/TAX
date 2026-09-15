@@ -5,6 +5,8 @@
  * 항목을 고쳐도 engine.js가 전체를 다시 계산하므로 이후 수치가 함께 갱신된다.
  */
 
+import { loadPlanBook, normalizePlanBook, savePlanBook } from "./plan.js";
+
 const STORAGE_KEY = "us-tax:transactions";
 const SME_KEY = "us-tax:sme-tickers";
 const SCHEMA_VERSION = 1;
@@ -166,13 +168,15 @@ export function addTransactions(newTransactions) {
 
 export function buildExportPayload(
   transactions = loadTransactions(),
-  smeTickers = loadSmeTickers()
+  smeTickers = loadSmeTickers(),
+  planBook = loadPlanBook()
 ) {
   return {
     version: SCHEMA_VERSION,
     exported_at: new Date().toISOString(),
     transactions,
     sme_tickers: normalizeSmeTickers(smeTickers),
+    sale_plans: normalizePlanBook(planBook),
   };
 }
 
@@ -209,5 +213,6 @@ export async function restoreBackup(file) {
   saveTransactions(transactions);
   // 중소기업 표시를 넣기 전에 만든 백업에는 목록이 없다. 그때는 지금 표시를 그대로 둔다.
   if (Array.isArray(parsed?.sme_tickers)) saveSmeTickers(parsed.sme_tickers);
+  if (parsed?.sale_plans && typeof parsed.sale_plans === "object") savePlanBook(parsed.sale_plans);
   return transactions;
 }

@@ -1,7 +1,90 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { evaluatePlan, normalizePlan } from "../static/plan.js";
+import {
+  activePlan,
+  addPlan,
+  duplicatePlan,
+  evaluatePlan,
+  loadPlanBook,
+  normalizePlan,
+  normalizePlanBook,
+  removePlan,
+  renamePlan,
+  savePlanBook,
+  setActiveItems,
+} from "../static/plan.js";
+
+test("계획이 없으면 빈 '매도계획 1'을 만든다", () => {
+  const book = normalizePlanBook(null);
+
+  assert.equal(book.plans.length, 1);
+  assert.equal(book.plans[0].name, "매도계획 1");
+  assert.equal(book.activeId, book.plans[0].id);
+});
+
+test("새 계획은 다음 번호 이름으로 만들고 그 계획을 보여준다", () => {
+  const book = addPlan(normalizePlanBook(null));
+
+  assert.deepEqual(book.plans.map((p) => p.name), ["매도계획 1", "매도계획 2"]);
+  assert.equal(activePlan(book).name, "매도계획 2");
+});
+
+test("복사본은 줄을 그대로 옮기되 고쳐도 원본이 바뀌지 않는다", () => {
+  const original = setActiveItems(normalizePlanBook(null), [
+    { id: "x", ticker: "A", quantity: 1, targetPrice: 1, saleDate: "2026-10-01", fxRate: 1300, included: true },
+  ]);
+  const copied = duplicatePlan(original, original.activeId);
+  const edited = setActiveItems(copied, [{ ...activePlan(copied).items[0], quantity: 99 }]);
+
+  assert.equal(activePlan(copied).name, "매도계획 1 복사본");
+  assert.notEqual(activePlan(copied).items[0].id, "x");
+  assert.equal(edited.plans[0].items[0].quantity, 1);
+  assert.equal(edited.plans[1].items[0].quantity, 99);
+});
+
+test("이름은 앞뒤 공백을 빼고 30자까지, 빈 이름으로는 바꾸지 않는다", () => {
+  const book = normalizePlanBook(null);
+  const id = book.activeId;
+
+  assert.equal(activePlan(renamePlan(book, id, "  연말 절세안  ")).name, "연말 절세안");
+  assert.equal(activePlan(renamePlan(book, id, "   ")).name, "매도계획 1");
+  assert.equal(activePlan(renamePlan(book, id, "가".repeat(40))).name.length, 30);
+});
+
+test("보고 있던 계획을 지우면 첫 계획으로, 마지막 하나를 지우면 빈 계획을 둔다", () => {
+  const two = addPlan(normalizePlanBook(null));
+  const afterRemove = removePlan(two, two.activeId);
+
+  assert.deepEqual(afterRemove.plans.map((p) => p.name), ["매도계획 1"]);
+  assert.equal(afterRemove.activeId, afterRemove.plans[0].id);
+
+  const empty = removePlan(afterRemove, afterRemove.activeId);
+  assert.equal(empty.plans.length, 1);
+  assert.equal(empty.plans[0].items.length, 0);
+});
+
+test("하나만 저장하던 예전 계획은 '매도계획 1'로 옮긴다", () => {
+  const store = new Map([
+    ["us-tax:sale-plan", JSON.stringify([{ id: "old", ticker: "A", quantity: 2, targetPrice: 5, saleDate: "2026-10-01", fxRate: 1300 }])],
+  ]);
+  globalThis.localStorage = {
+    getItem: (key) => (store.has(key) ? store.get(key) : null),
+    setItem: (key, value) => store.set(key, value),
+    removeItem: (key) => store.delete(key),
+  };
+  try {
+    const book = loadPlanBook();
+    assert.equal(book.plans[0].name, "매도계획 1");
+    assert.equal(book.plans[0].items[0].id, "old");
+
+    savePlanBook(book);
+    assert.equal(store.has("us-tax:sale-plan"), false);
+    assert.equal(JSON.parse(store.get("us-tax:sale-plans")).plans[0].items.length, 1);
+  } finally {
+    delete globalThis.localStorage;
+  }
+});
 
 // 환율 1,000원 고정. A·B 모두 주당 $100에 10주씩 보유(취득가액 각 100만원).
 const HOLDINGS = [

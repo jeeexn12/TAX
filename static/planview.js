@@ -1,15 +1,32 @@
 /**
- * 매도 계획 화면. 팔 계획을 여러 줄 적어두고 줄마다 켜고 끄며 세금과 손에 남는 돈을
- * 비교한다. 계산은 plan.js가 하고 여기서는 입력과 표시만 맡는다.
+ * 매도 계획 화면. 이름 붙인 계획을 여러 개 두고, 계획마다 팔 줄을 적어 켜고 끄며
+ * 세금과 손에 남는 돈을 비교한다. 계산은 plan.js가 하고 여기서는 입력과 표시만 맡는다.
  */
 
 import { COST_METHOD, replay } from "./engine.js";
-import { createPlanItem, evaluatePlan, loadPlan, savePlan } from "./plan.js";
+import {
+  activePlan,
+  addPlan,
+  createPlanItem,
+  duplicatePlan,
+  evaluatePlan,
+  loadPlanBook,
+  removePlan,
+  renamePlan,
+  savePlanBook,
+  setActiveItems,
+  setActivePlan,
+} from "./plan.js";
 import { loadSmeTickers } from "./storage.js";
 
 const DOMESTIC_GAIN_KEY = "us-tax:domestic-gain";
 
 const el = {
+  planSelect: document.getElementById("plan-select"),
+  planName: document.getElementById("plan-name"),
+  planNew: document.getElementById("plan-new"),
+  planCopy: document.getElementById("plan-copy"),
+  planRemove: document.getElementById("plan-remove"),
   form: document.getElementById("plan-form"),
   ticker: document.getElementById("plan-ticker"),
   quantity: document.getElementById("plan-quantity"),
@@ -21,9 +38,11 @@ const el = {
   tableBody: document.querySelector("#plan-table tbody"),
   tableWrap: document.getElementById("plan-table-wrap"),
   empty: document.getElementById("plan-empty"),
+  listTitle: document.getElementById("plan-list-title"),
   count: document.getElementById("plan-count"),
   marginalNote: document.getElementById("plan-marginal-note"),
   result: document.getElementById("plan-result"),
+  resultTitle: document.getElementById("plan-result-title"),
   proceeds: document.getElementById("plan-proceeds"),
   tax: document.getElementById("plan-tax"),
   net: document.getElementById("plan-net"),
@@ -40,9 +59,11 @@ const escapeHtml = (text) =>
 
 let transactions = [];
 let settings = { costMethod: COST_METHOD.FIFO, settlementDays: 2 };
-let plan = [];
+let book = { activeId: null, plans: [] };
 let todayFxRate = null;
 const prices = new Map();
+
+const currentItems = () => activePlan(book).items;
 
 function heldHoldings() {
   const { holdings } = replay(transactions, settings.costMethod);
@@ -99,6 +120,21 @@ async function fillDefaults() {
     el.price.value = price;
     el.formNote.textContent = `보유 ${shares(holding.quantity)}주 · 목표가는 현재가 $${price}로 채웠습니다.`;
   }
+}
+
+function renderBook() {
+  const plan = activePlan(book);
+  el.planSelect.innerHTML = book.plans
+    .map(
+      (p) =>
+        `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)} (${p.items.length}줄)</option>`
+    )
+    .join("");
+  el.planSelect.value = plan.id;
+  // 이름을 고치는 중에는 덮어쓰지 않는다.
+  if (document.activeElement !== el.planName) el.planName.value = plan.name;
+  el.listTitle.textContent = plan.name;
+  el.resultTitle.textContent = `${plan.name}: 켠 줄을 모두 실행하면`;
 }
 
 function renderForm() {
@@ -185,9 +221,11 @@ function yearRowHtml(year) {
 }
 
 function render() {
+  renderBook();
   renderForm();
 
-  const result = evaluatePlan(transactions, plan, {
+  const items = currentItems();
+  const result = evaluatePlan(transactions, items, {
     method: settings.costMethod,
     settlementDays: settings.settlementDays,
     domesticGainKrw: Number(localStorage.getItem(DOMESTIC_GAIN_KEY)) || 0,
@@ -195,13 +233,13 @@ function render() {
   });
   const resultById = new Map(result.items.map((item) => [item.id, item]));
 
-  el.tableBody.innerHTML = plan.map((item) => rowHtml(item, resultById.get(item.id))).join("");
-  el.empty.hidden = plan.length > 0;
-  el.tableWrap.hidden = plan.length === 0;
-  el.marginalNote.hidden = plan.filter((item) => item.included).length < 2;
+  el.tableBody.innerHTML = items.map((item) => rowHtml(item, resultById.get(item.id))).join("");
+  el.empty.hidden = items.length > 0;
+  el.tableWrap.hidden = items.length === 0;
 
-  const includedCount = plan.filter((item) => item.included).length;
-  el.count.textContent = plan.length ? `${plan.length}줄 중 ${includedCount}줄 포함` : "";
+  const includedCount = items.filter((item) => item.included).length;
+  el.marginalNote.hidden = includedCount < 2;
+  el.count.textContent = items.length ? `${items.length}줄 중 ${includedCount}줄 포함` : "";
 
   el.result.hidden = result.years.length === 0;
   el.proceeds.textContent = won(result.totals.proceedsKrw);
@@ -210,10 +248,12 @@ function render() {
   el.yearsBody.innerHTML = result.years.map(yearRowHtml).join("");
 }
 
-function updatePlan(nextPlan) {
-  plan = savePlan(nextPlan);
+function commit(nextBook) {
+  book = savePlanBook(nextBook);
   render();
 }
+
+const updateItems = (items) => commit(setActiveItems(book, items));
 
 function handleSubmit(event) {
   event.preventDefault();
@@ -224,15 +264,17 @@ function handleSubmit(event) {
     saleDate: el.date.value,
     fxRate: el.fx.value,
   });
-  updatePlan([...plan, item]);
+  updateItems([...currentItems(), item]);
 }
 
 /** 표 안 입력은 change(입력을 마쳤을 때)에만 다시 계산한다. 타이핑 중에 다시 그리면 커서가 튄다. */
 function handleTableChange(event) {
   const includeId = event.target.dataset.planInclude;
   if (includeId) {
-    updatePlan(
-      plan.map((item) => (item.id === includeId ? { ...item, included: event.target.checked } : item))
+    updateItems(
+      currentItems().map((item) =>
+        item.id === includeId ? { ...item, included: event.target.checked } : item
+      )
     );
     return;
   }
@@ -241,26 +283,70 @@ function handleTableChange(event) {
   const id = event.target.dataset.planId;
   if (!fieldName || !id) return;
   const value = fieldName === "saleDate" ? event.target.value : Number(event.target.value) || 0;
-  updatePlan(plan.map((item) => (item.id === id ? { ...item, [fieldName]: value } : item)));
+  updateItems(currentItems().map((item) => (item.id === id ? { ...item, [fieldName]: value } : item)));
 }
 
 function handleTableClick(event) {
   const deleteId = event.target.dataset.planDelete;
-  if (deleteId) updatePlan(plan.filter((item) => item.id !== deleteId));
+  if (deleteId) updateItems(currentItems().filter((item) => item.id !== deleteId));
+}
+
+function focusName() {
+  el.planName.focus();
+  el.planName.select();
+}
+
+function setupBookControls() {
+  el.planSelect.addEventListener("change", () => commit(setActivePlan(book, el.planSelect.value)));
+
+  // 입력하는 대로 저장한다. 한글은 조합 중 Enter가 글자 확정에 쓰여서 Enter나 칸을
+  // 벗어나는 순간에만 저장하면 이름이 안 바뀐 것처럼 보이는 경우가 생긴다.
+  // 표까지 다시 그릴 필요는 없어 계획 선택 영역만 갱신한다.
+  el.planName.addEventListener("input", () => {
+    book = savePlanBook(renamePlan(book, book.activeId, el.planName.value));
+    renderBook();
+  });
+  // 빈 이름은 받지 않으므로 칸을 벗어나면 저장된 이름으로 되돌려 보여준다.
+  el.planName.addEventListener("blur", () => {
+    el.planName.value = activePlan(book).name;
+  });
+  el.planName.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.isComposing) el.planName.blur();
+  });
+
+  el.planNew.addEventListener("click", () => {
+    commit(addPlan(book));
+    focusName();
+  });
+
+  el.planCopy.addEventListener("click", () => {
+    commit(duplicatePlan(book, book.activeId));
+    focusName();
+  });
+
+  el.planRemove.addEventListener("click", () => {
+    const plan = activePlan(book);
+    const detail = plan.items.length ? ` ${plan.items.length}줄이 함께 지워지고` : "";
+    if (!window.confirm(`"${plan.name}" 계획을 삭제할까요?${detail} 되돌릴 수 없습니다.`)) return;
+    commit(removePlan(book, plan.id));
+  });
 }
 
 export function refreshPlan(latestTransactions, latestSettings) {
   transactions = latestTransactions;
   settings = latestSettings;
+  // 백업을 불러오면 계획도 바뀌므로 화면에 올 때마다 저장된 것을 다시 읽는다.
+  book = loadPlanBook();
   render();
 }
 
 export function initPlan(initialTransactions, initialSettings) {
   transactions = initialTransactions;
   settings = initialSettings;
-  plan = loadPlan();
+  book = savePlanBook(loadPlanBook());
   el.date.value = today();
 
+  setupBookControls();
   el.form.addEventListener("submit", handleSubmit);
   el.ticker.addEventListener("change", fillDefaults);
   el.tableBody.addEventListener("change", handleTableChange);
