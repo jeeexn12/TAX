@@ -142,3 +142,13 @@ def test_api_error_code_raises(isolated_cache, monkeypatch, frozen_today):
 
     with pytest.raises(fx.FxLookupError, match="일일 조회 제한"):
         fx.get_usd_krw_rate(FRIDAY)
+
+
+def test_missing_api_key_is_reported_before_calling_the_api(monkeypatch):
+    calls = []
+    monkeypatch.setattr(fx, "EXIM_API_KEY", "")
+    monkeypatch.setattr(fx.requests, "get", lambda *args, **kwargs: calls.append(args))
+
+    with pytest.raises(fx.FxLookupError, match="EXIM_API_KEY"):
+        fx._fetch_rate(FRIDAY, "USD")
+    assert calls == []

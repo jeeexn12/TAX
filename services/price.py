@@ -35,18 +35,29 @@ def _quote_currency(ticker: yf.Ticker) -> str | None:
         return None
 
 
+def _closes(hist, ticker: str, when: str):
+    """종가 열에서 빈 값을 뺀다.
+
+    장이 열린 날 거래 전이거나 시간대가 어긋나면 마지막 줄이 NaN으로 오는 경우가 있다
+    (2026-09-16 배포 서버에서 7203.T로 확인). NaN을 가격으로 쓰면 JSON으로도 보낼 수 없다.
+    """
+    closes = hist["Close"].dropna() if not hist.empty else hist
+    if closes.empty:
+        raise PriceLookupError(f"'{ticker}'{when} 시세를 찾을 수 없습니다.")
+    return closes
+
+
 def get_daily_quotes(ticker: str, start: date, end: date) -> tuple[list[tuple[date, float]], str | None]:
     """구간 내 거래일별 종가와 호가 통화. 주말·휴장일은 애초에 행이 없으므로 자연히 빠진다."""
     t = yf.Ticker(ticker)
     hist = t.history(start=start.isoformat(), end=(end + timedelta(days=1)).isoformat())
-    if hist.empty:
-        raise PriceLookupError(f"'{ticker}'의 {start}~{end} 구간 시세를 찾을 수 없습니다.")
+    closes = _closes(hist, ticker, f"의 {start}~{end} 구간")
 
     raw_currency = _quote_currency(t)
     _, currency = normalize_quote(0.0, raw_currency)
     rows = [
         (stamp.date(), normalize_quote(float(close), raw_currency)[0])
-        for stamp, close in hist["Close"].items()
+        for stamp, close in closes.items()
     ]
     return rows, currency
 
@@ -58,10 +69,8 @@ def get_daily_closes(ticker: str, start: date, end: date) -> list[tuple[date, fl
 def get_current_price(ticker: str) -> tuple[float, str | None]:
     """가장 최근 종가와 호가 통화."""
     t = yf.Ticker(ticker)
-    hist = t.history(period="5d")
-    if hist.empty:
-        raise PriceLookupError(f"'{ticker}' 시세를 찾을 수 없습니다.")
-    return normalize_quote(float(hist["Close"].iloc[-1]), _quote_currency(t))
+    closes = _closes(t.history(period="5d"), ticker, "")
+    return normalize_quote(float(closes.iloc[-1]), _quote_currency(t))
 
 
 def get_current_price_usd(ticker: str) -> float:

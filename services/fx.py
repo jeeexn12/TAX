@@ -21,7 +21,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-EXIM_API_KEY = os.getenv("EXIM_API_KEY")
+# 배포 서비스 환경변수 입력칸에 붙여넣다 앞뒤 공백·줄바꿈이 섞이면 인증이 실패하므로 지운다.
+EXIM_API_KEY = (os.getenv("EXIM_API_KEY") or "").strip()
 EXIM_URL = "https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON"
 CACHE_FILE = Path(__file__).resolve().parent.parent / "data" / "fx_cache.json"
 
@@ -87,6 +88,8 @@ def parse_cur_unit(cur_unit: str) -> tuple[str, int]:
 
 def _fetch_rate(d: date, currency: str = "USD") -> float | None:
     """해당 날짜의 1통화당 원화 매매기준율. 고시가 없는 날(주말/공휴일)이면 None."""
+    if not EXIM_API_KEY:
+        raise FxLookupError("서버에 환율 API 키(EXIM_API_KEY)가 설정되지 않았습니다. 배포 서비스의 환경변수를 확인해주세요.")
     resp = requests.get(
         EXIM_URL,
         params={"authkey": EXIM_API_KEY, "searchdate": d.strftime("%Y%m%d"), "data": "AP01"},
