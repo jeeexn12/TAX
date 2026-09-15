@@ -4,6 +4,8 @@
  */
 
 import { COST_METHOD, annualSummary, replay, sellableInfo, simulate, taxFreeHeadroomKrw } from "./engine.js";
+import { loadSmeTickers, saveSmeTickers } from "./storage.js";
+import { isMixedRate, rateLabel } from "./taxview.js";
 
 const FX_SLIDER = { min: 1250, max: 1500, step: 10 };
 const TYPE_LABELS = { buy: "매수", sell: "매도", split: "주식분할" };
@@ -21,6 +23,7 @@ const el = {
   simPanel: document.getElementById("sim-panel"),
   domesticGain: document.getElementById("domestic-gain"),
   domesticWarning: document.getElementById("domestic-warning"),
+  smeHint: document.getElementById("sme-hint"),
 };
 
 const DOMESTIC_GAIN_KEY = "us-tax:domestic-gain";
@@ -40,6 +43,7 @@ const dateKr = (iso) => {
 let transactions = [];
 let costMethod = COST_METHOD.FIFO;
 let domesticGainKrw = 0;
+let smeTickers = [];
 let todayFxRate = null;
 const prices = new Map();
 const sim = new Map();
@@ -114,7 +118,13 @@ function activeHoldings() {
 
 function renderSummary() {
   const year = new Date().getFullYear();
-  const { tax, overseasGainKrw } = annualSummary(transactions, year, costMethod, domesticGainKrw);
+  const { tax, overseasGainKrw } = annualSummary(
+    transactions,
+    year,
+    costMethod,
+    domesticGainKrw,
+    smeTickers
+  );
 
   el.ytdGain.textContent = tax.totalGainKrw === 0 ? "—" : signedWon(tax.totalGainKrw);
   el.ytdTax.textContent =
@@ -125,7 +135,7 @@ function renderSummary() {
         ? `확정 매도분 예상세액 ${won(tax.totalTaxKrw)}`
         : "확정 매도분에 대한 세금은 없습니다.";
   el.headroom.textContent = won(
-    taxFreeHeadroomKrw(transactions, year, costMethod, domesticGainKrw)
+    taxFreeHeadroomKrw(transactions, year, costMethod, domesticGainKrw, smeTickers)
   );
 
   // 국내 대주주 30%, 비상장 중소기업 10% 등 20%가 아닌 물량이 섞이면
@@ -183,9 +193,11 @@ function simResultHtml(holding) {
     ],
     year,
     costMethod,
-    domesticGainKrw
+    domesticGainKrw,
+    smeTickers
   );
   const sale = outcome.simulatedSales[0];
+  const isSme = smeTickers.includes(holding.ticker);
 
   const yearNote =
     year === new Date().getFullYear()
@@ -197,14 +209,32 @@ function simResultHtml(holding) {
     <dl class="sim-result">
       <div><dt>양도가액</dt><dd>${won(sale.proceedsKrw)}</dd></div>
       <div><dt>취득가액 <em>${methodLabel()} 기준 ${shares(quantity)}주 대응분</em></dt><dd>${won(sale.costKrw)}</dd></div>
-      <div class="is-strong"><dt>양도차익</dt><dd>${signedWon(sale.gainKrw)}</dd></div>
+      <div class="is-strong"><dt>양도차익 <em>${isSme ? "중소기업 10% 세율" : "20% 세율"}</em></dt><dd>${signedWon(sale.gainKrw)}</dd></div>
       <div class="divider"></div>
       <div><dt>${year}년 실현손익 합계 <em>확정분 + 이 매도</em></dt><dd>${signedWon(outcome.after.totalGainKrw)}</dd></div>
-      <div><dt>기본공제</dt><dd>−${won(outcome.after.deductionKrw)}</dd></div>
-      <div><dt>과세표준</dt><dd>${won(outcome.after.taxableBaseKrw)}</dd></div>
-      <div class="is-total"><dt>${year}년 예상세액 <em>소득세 20% + 지방소득세 2%</em></dt><dd>${won(outcome.after.totalTaxKrw)}</dd></div>
+      <div><dt>기본공제 <em>먼저 판 매도부터 차감</em></dt><dd>−${won(outcome.after.deductionKrw)}</dd></div>
+      ${taxBaseRowsHtml(outcome.after)}
+      <div class="is-total"><dt>${year}년 예상세액 <em>${
+        isMixedRate(outcome.after)
+          ? "세율별 소득세 + 지방소득세(소득세의 10%)"
+          : "소득세 20% + 지방소득세 2%"
+      }</em></dt><dd>${won(outcome.after.totalTaxKrw)}</dd></div>
       <div class="is-highlight"><dt>이 매도로 늘어나는 세금</dt><dd>${won(outcome.additionalTaxKrw)}</dd></div>
     </dl>`;
+}
+
+/** 세율이 하나면 과세표준 한 줄, 섞이면 세율별로 나눠 보여준다. */
+function taxBaseRowsHtml(tax) {
+  if (!isMixedRate(tax)) {
+    return `<div><dt>과세표준</dt><dd>${won(tax.taxableBaseKrw)}</dd></div>`;
+  }
+  return tax.byRate
+    .map(
+      (bucket) => `
+      <div><dt>과세표준 <em>${rateLabel(bucket.ratePercent)} · 소득세 ${won(bucket.incomeTaxKrw)}</em></dt>
+        <dd>${won(bucket.taxableBaseKrw)}</dd></div>`
+    )
+    .join("");
 }
 
 function simulationHtml(holding) {
@@ -295,6 +325,10 @@ function render() {
             : `${signedWon(gain)}<br /><small>${((gain / holding.totalCostKrw) * 100).toFixed(1)}%</small>`
         }
       </td>
+      <td class="center">
+        <input type="checkbox" class="sme-toggle" data-sme="${holding.ticker}"
+          aria-label="${holding.ticker} 중소기업" ${smeTickers.includes(holding.ticker) ? "checked" : ""} />
+      </td>
       <td class="num">
         <button type="button" class="link" data-toggle="${holding.ticker}">
           ${isOpen ? "닫기" : "팔아보기"}
@@ -307,6 +341,7 @@ function render() {
   el.simPanel.innerHTML = openHolding ? simulationHtml(openHolding) : "";
 
   el.empty.hidden = holdings.length > 0;
+  el.smeHint.hidden = holdings.length === 0;
   el.count.textContent = holdings.length ? `${holdings.length}종목` : "";
 
   for (const holding of holdings) {
@@ -347,6 +382,17 @@ function handleTableClick(event) {
     return;
   }
 
+  const smeTicker = event.target.dataset.sme;
+  if (smeTicker) {
+    smeTickers = saveSmeTickers(
+      event.target.checked
+        ? [...smeTickers, smeTicker]
+        : smeTickers.filter((ticker) => ticker !== smeTicker)
+    );
+    render();
+    return;
+  }
+
   const manualTicker = event.target.dataset.priceManual;
   if (manualTicker) {
     const existing = prices.get(manualTicker) ?? {};
@@ -367,6 +413,7 @@ export function refreshHoldings(latestTransactions, method = COST_METHOD.FIFO) {
 }
 
 export function initHoldings() {
+  smeTickers = loadSmeTickers();
   domesticGainKrw = Number(localStorage.getItem(DOMESTIC_GAIN_KEY)) || 0;
   if (domesticGainKrw) el.domesticGain.value = domesticGainKrw;
 

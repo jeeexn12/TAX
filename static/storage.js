@@ -6,6 +6,7 @@
  */
 
 const STORAGE_KEY = "us-tax:transactions";
+const SME_KEY = "us-tax:sme-tickers";
 const SCHEMA_VERSION = 1;
 
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -131,17 +132,47 @@ export function validateTransactions(raw) {
   });
 }
 
+/**
+ * 중소기업으로 표시한 종목 목록. 도구가 판정하지 않고 사용자가 종목마다 한 번 표시한다.
+ * 판정은 매도한 해의 직전 사업연도 말 기준이라 해마다 달라질 수 있다.
+ */
+export function normalizeSmeTickers(raw) {
+  if (!Array.isArray(raw)) return [];
+  const tickers = raw
+    .filter((ticker) => typeof ticker === "string" && ticker.trim())
+    .map((ticker) => ticker.trim().toUpperCase());
+  return [...new Set(tickers)].sort();
+}
+
+export function loadSmeTickers() {
+  try {
+    return normalizeSmeTickers(JSON.parse(localStorage.getItem(SME_KEY) ?? "[]"));
+  } catch {
+    return [];
+  }
+}
+
+export function saveSmeTickers(tickers) {
+  const normalized = normalizeSmeTickers(tickers);
+  localStorage.setItem(SME_KEY, JSON.stringify(normalized));
+  return normalized;
+}
+
 export function addTransactions(newTransactions) {
   const saved = newTransactions.map((tx) => ({ ...tx, id: newId() }));
   saveTransactions([...loadTransactions(), ...saved]);
   return saved;
 }
 
-export function buildExportPayload(transactions = loadTransactions()) {
+export function buildExportPayload(
+  transactions = loadTransactions(),
+  smeTickers = loadSmeTickers()
+) {
   return {
     version: SCHEMA_VERSION,
     exported_at: new Date().toISOString(),
     transactions,
+    sme_tickers: normalizeSmeTickers(smeTickers),
   };
 }
 
@@ -176,5 +207,7 @@ export async function restoreBackup(file) {
   }
   const transactions = validateTransactions(parsed);
   saveTransactions(transactions);
+  // 중소기업 표시를 넣기 전에 만든 백업에는 목록이 없다. 그때는 지금 표시를 그대로 둔다.
+  if (Array.isArray(parsed?.sme_tickers)) saveSmeTickers(parsed.sme_tickers);
   return transactions;
 }
