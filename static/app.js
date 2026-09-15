@@ -249,6 +249,13 @@ function refreshSettlementDate({ force = false } = {}) {
   el.settlementNote.className = crossesYear ? "hint is-warning" : "hint";
 }
 
+/** 환율 칸 아래 설명을 직접 입력 여부에 맞춘다. */
+function updateFxBasis() {
+  document.getElementById("fx-basis").textContent = el.fxManual.checked
+    ? "증권사 결제내역에 나온 환율"
+    : "결제일의 고시환율 (실시간 시세 아님)";
+}
+
 /**
  * 거래 종류에 맞춰 환율 입력 방식을 정한다. 매수는 증권사 결제내역에 구매가와 환율이 이미
  * 나오므로 직접 입력이 기본이고, 매도는 결제일 고시환율을 자동 조회한다(2026-09-16 결정).
@@ -264,9 +271,7 @@ function applyFxMode() {
   el.fxRate.value = "";
   fxAppliedDate = null;
   el.fxRate.placeholder = manual ? "결제내역의 환율" : "결제일을 입력하면 자동 조회";
-  document.getElementById("fx-basis").textContent = manual
-    ? "증권사 결제내역에 나온 환율"
-    : "결제일의 고시환율 (실시간 시세 아님)";
+  updateFxBasis();
   if (manual) {
     el.fxNote.textContent = "결제 환율을 직접 입력해주세요.";
     el.fxNote.className = "hint";
@@ -892,6 +897,7 @@ function init() {
 
   el.fxManual.addEventListener("change", () => {
     el.fxRate.disabled = !el.fxManual.checked;
+    updateFxBasis();
     if (el.fxManual.checked) {
       el.fxNote.textContent = "직접 입력한 환율이 적용됩니다.";
       el.fxNote.className = "hint";
