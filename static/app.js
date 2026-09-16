@@ -453,7 +453,12 @@ function findError() {
   if (el.settlementDate.value < el.date.value) return "결제일이 체결일보다 빠릅니다.";
   if (!(Number(el.quantity.value) > 0)) return "수량은 0보다 커야 합니다.";
   if (!(Number(el.price.value) >= 0)) return "단가를 입력해주세요.";
-  if (!(Number(el.fxRate.value) > 0)) return "적용환율을 확인해주세요.";
+  if (!(Number(el.fxRate.value) > 0)) {
+    // 매수는 자동 조회를 하지 않으므로 무엇을 넣어야 하는지까지 알려준다.
+    return el.fxManual.checked
+      ? "증권사 결제내역에 나온 환율을 적용환율 칸에 입력해주세요."
+      : "적용환율을 확인해주세요.";
+  }
 
   const check = canAddTransaction(transactions, buildTransaction(), settings.costMethod);
   if (!check.ok) {
